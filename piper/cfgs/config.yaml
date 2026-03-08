@@ -34,7 +34,20 @@ feature_dim: 50
 num_train_frames: 2100000
 
 # piper specific
-use_sim: true  # 设置为 false 使用真实机械臂，true 使用模拟
+use_sim: false  # 设置为 false 使用真实机械臂，true 使用模拟
+visualize: true  # 设置为 true 在训练时显示摄像头画面
+print_reward: true  # 设置为 true 在训练时打印 reward 信息
+
+# AprilTag 物体追踪设置
+use_apriltag: true  # 设置为 true 使用 AprilTag 检测物体位置（真实世界）
+tag_size: 0.05  # AprilTag 的物理大小（单位：米），请根据实际打印大小调整
+
+# 目标位置设置 (单位: 米)
+# X: 左右方向 (右为正)
+# Y: 前后方向 (前为正)
+# Z: 上下方向 (上为正)
+goal_pos: [0.0, 0.75, 0.0]  # 默认目标位置（请根据实际情况调整）
+obj_pos: [0.0, 0.6, 0.0]    # 默认物体初始位置（请根据实际情况调整）
 
 # nstep alpha schedule
 nstep_alpha_temp: 1000000

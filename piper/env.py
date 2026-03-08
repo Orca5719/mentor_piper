@@ -1,9 +1,10 @@
 import numpy as np
+import cv2
 from gym import spaces
 from dm_env import StepType, specs
 from typing import Any, NamedTuple
 from collections import deque
-from piper.robot import PiperRobot
+from piper_robot_with_apriltag import PiperRobotWithAprilTag as PiperRobot
 
 
 class NormalizeAction:
@@ -94,16 +95,24 @@ class ExtendedTimeStep(NamedTuple):
 
 class PiperEnv:
     def __init__(self, task_name, seed=None, action_repeat=1, 
-                 size=(256, 256), use_sim=True):
+                 size=(256, 256), use_sim=True, visualize=False,
+                 obj_pos=None, goal_pos=None, print_reward=True,
+                 use_apriltag=False, tag_size=0.05):
         self.task_name = task_name
         self._size = size
         self._action_repeat = action_repeat
+        self._visualize = visualize
+        self._print_reward = print_reward
         
         np.random.seed(seed)
         
         self.robot = PiperRobot(use_sim=use_sim, 
                                 camera_width=size[0], 
-                                camera_height=size[1])
+                                camera_height=size[1],
+                                obj_pos=obj_pos,
+                                goal_pos=goal_pos,
+                                use_apriltag=use_apriltag,
+                                tag_size=tag_size)
         
         self.observation_space = spaces.Box(
             low=0, high=255, 
@@ -118,6 +127,60 @@ class PiperEnv:
         
         self.step_count = 0
         self.obj_init_pos = np.array([0.0, 0.6, 0.0])
+        self._episode_reward = 0.0
+        self._window_name = "Piper Training Camera"
+    
+    def _visualize_frame(self, obs, reward, success, step_count, obj_to_target=None, episode_reward=None):
+        if not self._visualize:
+            return
+        
+        try:
+            display_img = cv2.cvtColor(obs, cv2.COLOR_RGB2BGR)
+            
+            y_pos = 30
+            line_spacing = 30
+            
+            cv2.putText(display_img, f"Step: {step_count}", (10, y_pos),
+                       cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 255, 0), 2)
+            y_pos += line_spacing
+            
+            cv2.putText(display_img, f"Reward: {reward:.2f}", (10, y_pos),
+                       cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 255, 0), 2)
+            y_pos += line_spacing
+            
+            if episode_reward is not None:
+                cv2.putText(display_img, f"Episode Reward: {episode_reward:.2f}", (10, y_pos),
+                           cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 255, 0), 2)
+                y_pos += line_spacing
+            
+            if obj_to_target is not None:
+                color = (0, 255, 0) if obj_to_target <= 0.07 else (0, 165, 255)
+                cv2.putText(display_img, f"Obj->Target: {obj_to_target:.4f}m", (10, y_pos),
+                           cv2.FONT_HERSHEY_SIMPLEX, 0.6, color, 2)
+                y_pos += line_spacing
+            
+            success_color = (0, 255, 0) if success else (0, 0, 255)
+            cv2.putText(display_img, f"Success: {'Yes' if success else 'No'}", (10, y_pos),
+                       cv2.FONT_HERSHEY_SIMPLEX, 0.6, success_color, 2)
+            y_pos += line_spacing
+            
+            cv2.putText(display_img, "Press 'q' to close (training continues)", (10, y_pos),
+                       cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 200, 255), 1)
+            
+            cv2.imshow(self._window_name, display_img)
+            
+            key = cv2.waitKey(1) & 0xFF
+            if key == ord('q'):
+                print("\n用户关闭可视化窗口，继续训练...")
+                self._visualize = False
+                try:
+                    cv2.destroyWindow(self._window_name)
+                except:
+                    pass
+                    
+        except Exception as e:
+            print(f"可视化错误: {e}")
+            self._visualize = False
     
     @property
     def obs_space(self):
@@ -217,6 +280,7 @@ class PiperEnv:
     def reset(self):
         self.robot.reset()
         self.step_count = 0
+        self._episode_reward = 0.0
         
         if np.random.random() < 0.3:
             obj_x = np.random.uniform(-0.1, 0.1)
@@ -234,6 +298,8 @@ class PiperEnv:
         
         obs = self.robot.get_camera_image()
         
+        self._visualize_frame(obs, 0.0, False, 0)
+        
         return {
             "reward": 0.0,
             "is_first": True,
@@ -247,17 +313,34 @@ class PiperEnv:
         assert np.isfinite(action["action"]).all(), action["action"]
         total_reward = 0.0
         success = 0.0
+        obj_to_target = 0.0
         
         for _ in range(self._action_repeat):
             self.robot.step(action["action"])
-            reward, suc, _ = self._compute_reward(action["action"])
+            reward, suc, ott = self._compute_reward(action["action"])
             success += float(suc)
             total_reward += reward or 0.0
+            obj_to_target = ott
         
         success = min(success, 1.0)
         assert success in [0.0, 1.0]
         
         obs = self.robot.get_camera_image()
+        self.step_count += 1
+        self._episode_reward += total_reward
+        
+        # 打印 reward 信息
+        if self._print_reward:
+            tcp_pos = self.robot.get_end_effector_pos()
+            obj_pos = self.robot.get_obj_pos()
+            print(f"[Step {self.step_count:3d}] "
+                  f"Reward: {total_reward:6.2f} | "
+                  f"Episode Reward: {self._episode_reward:6.2f} | "
+                  f"Obj->Target: {obj_to_target:.4f}m | "
+                  f"Success: {'✅' if success else '❌'}")
+        
+        self._visualize_frame(obs, total_reward, bool(success), self.step_count, 
+                             obj_to_target, self._episode_reward)
         
         return {
             "reward": total_reward,
@@ -272,6 +355,11 @@ class PiperEnv:
         return self.robot.get_camera_image()
     
     def close(self):
+        try:
+            if self._visualize:
+                cv2.destroyAllWindows()
+        except:
+            pass
         self.robot.close()
 
 
@@ -358,8 +446,14 @@ class PiperWrapper:
             raise ValueError(name)
 
 
-def make(name, frame_stack, action_repeat, seed, use_sim=True):
-    env = PiperEnv(name, seed, action_repeat, (256, 256), use_sim=use_sim)
+def make(name, frame_stack, action_repeat, seed, use_sim=True, visualize=False,
+         obj_pos=None, goal_pos=None, print_reward=True,
+         use_apriltag=False, tag_size=0.05):
+    env = PiperEnv(name, seed, action_repeat, (256, 256), 
+                   use_sim=use_sim, visualize=visualize,
+                   obj_pos=obj_pos, goal_pos=goal_pos,
+                   print_reward=print_reward,
+                   use_apriltag=use_apriltag, tag_size=tag_size)
     env = NormalizeAction(env)
     env = TimeLimit(env, 250)
     env = PiperWrapper(env, frame_stack)

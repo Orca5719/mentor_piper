@@ -80,19 +80,38 @@ class Workspace:
                              use_wandb=self.cfg.use_wandb)
         
         use_sim = getattr(self.cfg, 'use_sim', True)
+        visualize = getattr(self.cfg, 'visualize', False)
+        obj_pos = getattr(self.cfg, 'obj_pos', None)
+        goal_pos = getattr(self.cfg, 'goal_pos', None)
+        print_reward = getattr(self.cfg, 'print_reward', True)
+        use_apriltag = getattr(self.cfg, 'use_apriltag', False)
+        tag_size = getattr(self.cfg, 'tag_size', 0.05)
+        
         self.train_env = piper_env.make(
             self.cfg.task_name, 
             self.cfg.frame_stack,
             self.cfg.action_repeat, 
             self.cfg.seed,
-            use_sim=use_sim
+            use_sim=use_sim,
+            visualize=visualize,
+            obj_pos=obj_pos,
+            goal_pos=goal_pos,
+            print_reward=print_reward,
+            use_apriltag=use_apriltag,
+            tag_size=tag_size
         )
         self.eval_env = piper_env.make(
             self.cfg.task_name, 
             self.cfg.frame_stack,
             self.cfg.action_repeat, 
             self.cfg.seed,
-            use_sim=use_sim
+            use_sim=use_sim,
+            visualize=visualize,
+            obj_pos=obj_pos,
+            goal_pos=goal_pos,
+            print_reward=print_reward,
+            use_apriltag=use_apriltag,
+            tag_size=tag_size
         )
         
         data_specs = (self.train_env.observation_spec(),
