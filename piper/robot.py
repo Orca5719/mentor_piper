@@ -52,6 +52,11 @@ class PiperRobot:
                     time.sleep(0.01)
                 
                 self.piper.GripperCtrl(0, 1000, 0x01, 0)
+                # 多次调用确保模式切换成功
+                for _ in range(3):
+                    self.piper.ModeCtrl(0x01, 0x01, 50, 0x00)
+                    self.piper.EnableArm(7, 0x02)
+                    time.sleep(0.05)
                 print("✓ 机械臂连接成功")
             except Exception as e:
                 print(f"警告：无法连接机械臂：{e}，将使用模拟模式")
@@ -234,19 +239,37 @@ class PiperRobot:
             try:
                 spd = speed if speed is not None else 100
                 
-                joint_0 = round(joint_pos[0] * self.factor)
-                joint_1 = round(joint_pos[1] * self.factor)
-                joint_2 = round(joint_pos[2] * self.factor)
-                joint_3 = round(joint_pos[3] * self.factor)
-                joint_4 = round(joint_pos[4] * self.factor)
-                joint_5 = round(joint_pos[5] * self.factor)
+                # 关节角度限制（单位：弧度）
+                joint_limits = [
+                    (-2.6179, 2.6179),  # Joint 1: [-150°, 150°]
+                    (0, 3.14),          # Joint 2: [0°, 180°]
+                    (-2.967, 0),        # Joint 3: [-170°, 0°]
+                    (-1.745, 1.745),    # Joint 4: [-100°, 100°]
+                    (-1.22, 1.22),      # Joint 5: [-70°, 70°]
+                    (-2.09439, 2.09439) # Joint 6: [-120°, 120°]
+                ]
+                
+                # 限制关节角度在安全范围内
+                joint_pos_clipped = np.clip(joint_pos, 
+                                            [lim[0] for lim in joint_limits],
+                                            [lim[1] for lim in joint_limits])
+                
+                joint_0 = round(joint_pos_clipped[0] * self.factor)
+                joint_1 = round(joint_pos_clipped[1] * self.factor)
+                joint_2 = round(joint_pos_clipped[2] * self.factor)
+                joint_3 = round(joint_pos_clipped[3] * self.factor)
+                joint_4 = round(joint_pos_clipped[4] * self.factor)
+                joint_5 = round(joint_pos_clipped[5] * self.factor)
                 
                 gripper_cmd = round(abs(self.gripper_pos) * 1000 * 1000)
                 
                 print(f"[DEBUG] joint_0-5: {joint_0}, {joint_1}, {joint_2}, {joint_3}, {joint_4}, {joint_5}")
                 print(f"[DEBUG] gripper_cmd: {gripper_cmd}")
                 
-                self.piper.MotionCtrl_2(0x01, 0x01, spd, 0x00)
+                # 确保机械臂处于 CAN 命令控制模式并使能电机
+                self.piper.ModeCtrl(0x01, 0x01, spd, 0x00)
+                self.piper.EnableArm(7, 0x02)
+                time.sleep(0.01)  # 等待命令生效
                 self.piper.JointCtrl(joint_0, joint_1, joint_2, joint_3, joint_4, joint_5)
                 self.piper.GripperCtrl(gripper_cmd, 1000, 0x01, 0)
                 

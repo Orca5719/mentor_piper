@@ -1,966 +1,173 @@
-[DEBUG] joint_0-5: -100532, 194336, 104632, -87794, -63548, -79526
-[DEBUG] gripper_cmd: 983160
-[DEBUG] camera_pos (tag_pos): [0.07700108 0.13471631 1.17222126]
-[DEBUG] offset_m: [200.55665836  19.74480207 100.73838048]
-[DEBUG] robot_pos: [200.63365945  19.87951838 101.91060174]
-[DEBUG] obj_pos: [200.63365945  19.87951838 101.91060174], target_pos: [ 0.0239 -0.2005  1.5526]
+[DEBUG] camera_pos (tag_pos): [0.07695366 0.13458952 1.17128524]
+[DEBUG] offset_m: [0.20055666 0.0197448  0.10073838]
+[DEBUG] robot_pos: [0.27751032 0.15433432 1.27202362]
+[DEBUG] obj_pos: [0.27751032 0.15433432 1.27202362], target_pos: [ 0.0239 -0.2005  1.5526]
+[DEBUG] aprilag_visible: True
+[DEBUG] joint_0-5: 57392, 95432, 171454, -40881, 2264, -7026
+[DEBUG] gripper_cmd: 699767
+[DEBUG] Arm Status: time stamp:1773119718.5410235
+Hz:200.0
+Control Mode: CAN_CTRL(0x1)
+Arm Status: NORMAL(0x0)
+Mode Feed: MOVE_J(0x1)
+Teach Status: STOP_RECORDING(0x2)
+Motion Status: REACH_TARGET_POS_SUCCESSFULLY(0x0)
+Trajectory Num: 0
+Error Code: 0
+Error Status: 
+ Joint 1 Angle Limit Status: False
+ Joint 2 Angle Limit Status: False
+ Joint 3 Angle Limit Status: False
+ Joint 4 Angle Limit Status: False
+ Joint 5 Angle Limit Status: False
+ Joint 6 Angle Limit Status: False
+ Joint 1 Communication Status: False
+ Joint 2 Communication Status: False
+ Joint 3 Communication Status: False
+ Joint 4 Communication Status: False
+ Joint 5 Communication Status: False
+ Joint 6 Communication Status: False
+
+
+
+[DEBUG] camera_pos (tag_pos): [0.07688515 0.134484   1.17025007]
+[DEBUG] offset_m: [0.20055666 0.0197448  0.10073838]
+[DEBUG] robot_pos: [0.27744181 0.1542288  1.27098845]
+[DEBUG] obj_pos: [0.27744181 0.1542288  1.27098845], target_pos: [ 0.0239 -0.2005  1.5526]
+[DEBUG] aprilag_visible: True
+[DEBUG] camera_pos (tag_pos): [0.07693654 0.13453684 1.17089603]
+[DEBUG] offset_m: [0.20055666 0.0197448  0.10073838]
+[DEBUG] robot_pos: [0.2774932  0.15428164 1.27163441]
+[Step 107] Reward:   0.00 | Episode Reward:   0.00 | Obj->Target: 0.5191m | Success: ❌
+[DEBUG] joint_0-5: 61881, 97480, 168953, -43352, -157, -11682
+[DEBUG] gripper_cmd: 113803
+[DEBUG] Arm Status: time stamp:1773119718.6310081
+Hz:200.0
+Control Mode: CAN_CTRL(0x1)
+Arm Status: NORMAL(0x0)
+Mode Feed: MOVE_J(0x1)
+Teach Status: STOP_RECORDING(0x2)
+Motion Status: REACH_TARGET_POS_SUCCESSFULLY(0x0)
+Trajectory Num: 0
+Error Code: 0
+Error Status: 
+ Joint 1 Angle Limit Status: False
+ Joint 2 Angle Limit Status: False
+ Joint 3 Angle Limit Status: False
+ Joint 4 Angle Limit Status: False
+ Joint 5 Angle Limit Status: False
+ Joint 6 Angle Limit Status: False
+ Joint 1 Communication Status: False
+ Joint 2 Communication Status: False
+ Joint 3 Communication Status: False
+ Joint 4 Communication Status: False
+ Joint 5 Communication Status: False
+ Joint 6 Communication Status: False
+
+
+
+[DEBUG] camera_pos (tag_pos): [0.07689655 0.13451856 1.1708195 ]
+[DEBUG] offset_m: [0.20055666 0.0197448  0.10073838]
+[DEBUG] robot_pos: [0.27745321 0.15426337 1.27155788]
+[DEBUG] obj_pos: [0.27745321 0.15426337 1.27155788], target_pos: [ 0.0239 -0.2005  1.5526]
+[DEBUG] aprilag_visible: True
+[DEBUG] joint_0-5: 66370, 99528, 166452, -45822, -2578, -16338
+[DEBUG] gripper_cmd: 113803
+[DEBUG] Arm Status: time stamp:1773119718.6660273
+Hz:200.0
+Control Mode: CAN_CTRL(0x1)
+Arm Status: NORMAL(0x0)
+Mode Feed: MOVE_J(0x1)
+Teach Status: STOP_RECORDING(0x2)
+Motion Status: REACH_TARGET_POS_SUCCESSFULLY(0x0)
+Trajectory Num: 0
+Error Code: 0
+Error Status: 
+ Joint 1 Angle Limit Status: False
+ Joint 2 Angle Limit Status: False
+ Joint 3 Angle Limit Status: False
+ Joint 4 Angle Limit Status: False
+ Joint 5 Angle Limit Status: False
+ Joint 6 Angle Limit Status: False
+ Joint 1 Communication Status: False
+ Joint 2 Communication Status: False
+ Joint 3 Communication Status: False
+ Joint 4 Communication Status: False
+ Joint 5 Communication Status: False
+ Joint 6 Communication Status: False
+
+
+
+[DEBUG] camera_pos (tag_pos): [0.07720243 0.13499804 1.17481974]
+[DEBUG] offset_m: [0.20055666 0.0197448  0.10073838]
+[DEBUG] robot_pos: [0.27775909 0.15474285 1.27555812]
+[DEBUG] obj_pos: [0.27775909 0.15474285 1.27555812], target_pos: [ 0.0239 -0.2005  1.5526]
+[DEBUG] aprilag_visible: True
+[DEBUG] camera_pos (tag_pos): [0.07702419 0.13471292 1.17237264]
+[DEBUG] offset_m: [0.20055666 0.0197448  0.10073838]
+[DEBUG] robot_pos: [0.27758085 0.15445772 1.27311102]
+[Step 108] Reward:   0.00 | Episode Reward:   0.00 | Obj->Target: 0.5171m | Success: ❌
+[DEBUG] joint_0-5: 61661, 96175, 168953, -49244, -708, -18279
+[DEBUG] gripper_cmd: 188689
+[DEBUG] Arm Status: time stamp:1773119718.7660406
+Hz:200.0
+Control Mode: CAN_CTRL(0x1)
+Arm Status: NORMAL(0x0)
+Mode Feed: MOVE_J(0x1)
+Teach Status: STOP_RECORDING(0x2)
+Motion Status: REACH_TARGET_POS_SUCCESSFULLY(0x0)
+Trajectory Num: 0
+Error Code: 0
+Error Status: 
+ Joint 1 Angle Limit Status: False
+ Joint 2 Angle Limit Status: False
+ Joint 3 Angle Limit Status: False
+ Joint 4 Angle Limit Status: False
+ Joint 5 Angle Limit Status: False
+ Joint 6 Angle Limit Status: False
+ Joint 1 Communication Status: False
+ Joint 2 Communication Status: False
+ Joint 3 Communication Status: False
+ Joint 4 Communication Status: False
+ Joint 5 Communication Status: False
+ Joint 6 Communication Status: False
+
+
+
+[DEBUG] camera_pos (tag_pos): [0.07694674 0.13458523 1.17113333]
+[DEBUG] offset_m: [0.20055666 0.0197448  0.10073838]
+[DEBUG] robot_pos: [0.27750339 0.15433004 1.27187171]
+[DEBUG] obj_pos: [0.27750339 0.15433004 1.27187171], target_pos: [ 0.0239 -0.2005  1.5526]
+[DEBUG] aprilag_visible: True
+[DEBUG] joint_0-5: 56951, 92821, 171453, -52666, 1162, -20221
+[DEBUG] gripper_cmd: 188689
+[DEBUG] Arm Status: time stamp:1773119718.801014
+Hz:200.0
+Control Mode: CAN_CTRL(0x1)
+Arm Status: NORMAL(0x0)
+Mode Feed: MOVE_J(0x1)
+Teach Status: STOP_RECORDING(0x2)
+Motion Status: REACH_TARGET_POS_SUCCESSFULLY(0x0)
+Trajectory Num: 0
+Error Code: 0
+Error Status: 
+ Joint 1 Angle Limit Status: False
+ Joint 2 Angle Limit Status: False
+ Joint 3 Angle Limit Status: False
+ Joint 4 Angle Limit Status: False
+ Joint 5 Angle Limit Status: False
+ Joint 6 Angle Limit Status: False
+ Joint 1 Communication Status: False
+ Joint 2 Communication Status: False
+ Joint 3 Communication Status: False
+ Joint 4 Communication Status: False
+ Joint 5 Communication Status: False
+ Joint 6 Communication Status: False
+
+
+
+[DEBUG] camera_pos (tag_pos): [0.07699032 0.13463577 1.17168337]
+[DEBUG] offset_m: [0.20055666 0.0197448  0.10073838]
+[DEBUG] robot_pos: [0.27754698 0.15438058 1.27242175]
+[DEBUG] obj_pos: [0.27754698 0.15438058 1.27242175], target_pos: [ 0.0239 -0.2005  1.5526]
 [DEBUG] aprilag_visible: True
-[DEBUG] joint_0-5: -95846, 192234, 99185, -85059, -61886, -81403
-[DEBUG] gripper_cmd: 983160
-[DEBUG] camera_pos (tag_pos): [0.07699407 0.13472619 1.17224401]
-[DEBUG] offset_m: [200.55665836  19.74480207 100.73838048]
-[DEBUG] robot_pos: [200.63365243  19.87952826 101.91062449]
-[DEBUG] obj_pos: [200.63365243  19.87952826 101.91062449], target_pos: [ 0.0239 -0.2005  1.5526]
-[DEBUG] aprilag_visible: True
-[DEBUG] camera_pos (tag_pos): [0.07700214 0.13473818 1.17237182]
-[DEBUG] offset_m: [200.55665836  19.74480207 100.73838048]
-[DEBUG] robot_pos: [200.63366051  19.87954025 101.9107523 ]
-[Step 250] Reward:   0.00 | Episode Reward:   0.00 | Obj->Target: 225.2093m | Success: ❌
-[DEBUG] camera_pos (tag_pos): [0.07700786 0.13470793 1.17216085]
-[DEBUG] offset_m: [200.55665836  19.74480207 100.73838048]
-[DEBUG] robot_pos: [200.63366623  19.87951    101.91054133]
-[DEBUG] joint_0-5: 5779, 9101, -5455, 13216, -10101, -26659
-[DEBUG] gripper_cmd: 707805
-[DEBUG] camera_pos (tag_pos): [0.0770351  0.13480469 1.17288977]
-[DEBUG] offset_m: [200.55665836  19.74480207 100.73838048]
-[DEBUG] robot_pos: [200.63369347  19.87960675 101.91127025]
-[DEBUG] obj_pos: [200.63369347  19.87960675 101.91127025], target_pos: [ 0.0239 -0.2005  1.5526]
-[DEBUG] aprilag_visible: True
-[DEBUG] joint_0-5: 6376, 4299, -6013, 16396, -9748, -27505
-[DEBUG] gripper_cmd: 707805
-[DEBUG] camera_pos (tag_pos): [0.0769661  0.13469129 1.17196355]
-[DEBUG] offset_m: [200.55665836  19.74480207 100.73838048]
-[DEBUG] robot_pos: [200.63362447  19.87949336 101.91034403]
-[DEBUG] obj_pos: [200.63362447  19.87949336 101.91034403], target_pos: [ 0.0239 -0.2005  1.5526]
-[DEBUG] aprilag_visible: True
-[DEBUG] camera_pos (tag_pos): [0.07700984 0.13478835 1.17262481]
-[DEBUG] offset_m: [200.55665836  19.74480207 100.73838048]
-[DEBUG] robot_pos: [200.6336682   19.87959041 101.91100529]
-[Step   1] Reward:   0.00 | Episode Reward:   0.00 | Obj->Target: 225.2091m | Success: ❌
-[DEBUG] joint_0-5: 8949, 3645, -11201, 16536, -9250, -31259
-[DEBUG] gripper_cmd: 995570
-[DEBUG] camera_pos (tag_pos): [0.07693307 0.13459706 1.17121283]
-[DEBUG] offset_m: [200.55665836  19.74480207 100.73838048]
-[DEBUG] robot_pos: [200.63359143  19.87939913 101.90959331]
-[DEBUG] obj_pos: [200.63359143  19.87939913 101.90959331], target_pos: [ 0.0239 -0.2005  1.5526]
-[DEBUG] aprilag_visible: True
-[DEBUG] joint_0-5: 11523, 2992, -16389, 16675, -8751, -35013
-[DEBUG] gripper_cmd: 995570
-[DEBUG] camera_pos (tag_pos): [0.0770524  0.13484122 1.17313607]
-[DEBUG] offset_m: [200.55665836  19.74480207 100.73838048]
-[DEBUG] robot_pos: [200.63371076  19.87964328 101.91151655]
-[DEBUG] obj_pos: [200.63371076  19.87964328 101.91151655], target_pos: [ 0.0239 -0.2005  1.5526]
-[DEBUG] aprilag_visible: True
-[DEBUG] camera_pos (tag_pos): [0.07698466 0.13465467 1.17174657]
-[DEBUG] offset_m: [200.55665836  19.74480207 100.73838048]
-[DEBUG] robot_pos: [200.63364303  19.87945674 101.91012705]
-[Step   2] Reward:   0.00 | Episode Reward:   0.00 | Obj->Target: 225.2097m | Success: ❌
-[DEBUG] joint_0-5: 16006, 4021, -16369, 21784, -5102, -38479
-[DEBUG] gripper_cmd: 929500
-[DEBUG] camera_pos (tag_pos): [0.076944   0.13464424 1.17160952]
-[DEBUG] offset_m: [200.55665836  19.74480207 100.73838048]
-[DEBUG] robot_pos: [200.63360236  19.87944631 101.90999   ]
-[DEBUG] obj_pos: [200.63360236  19.87944631 101.90999   ], target_pos: [ 0.0239 -0.2005  1.5526]
-[DEBUG] aprilag_visible: True
-[DEBUG] joint_0-5: 20490, 5050, -16350, 26892, -1452, -41944
-[DEBUG] gripper_cmd: 929500
-[DEBUG] camera_pos (tag_pos): [0.0770422  0.13480668 1.17292603]
-[DEBUG] offset_m: [200.55665836  19.74480207 100.73838048]
-[DEBUG] robot_pos: [200.63370056  19.87960875 101.91130651]
-[DEBUG] obj_pos: [200.63370056  19.87960875 101.91130651], target_pos: [ 0.0239 -0.2005  1.5526]
-[DEBUG] aprilag_visible: True
-[DEBUG] camera_pos (tag_pos): [0.07700549 0.13473273 1.17239831]
-[DEBUG] offset_m: [200.55665836  19.74480207 100.73838048]
-[DEBUG] robot_pos: [200.63366385  19.8795348  101.91077879]
-[Step   3] Reward:   0.00 | Episode Reward:   0.00 | Obj->Target: 225.2096m | Success: ❌
-[DEBUG] joint_0-5: 24001, 7129, -20419, 26660, 867, -39298
-[DEBUG] gripper_cmd: 814011
-[DEBUG] camera_pos (tag_pos): [0.07694592 0.13459853 1.17131289]
-[DEBUG] offset_m: [200.55665836  19.74480207 100.73838048]
-[DEBUG] robot_pos: [200.63360428  19.8794006  101.90969337]
-[DEBUG] obj_pos: [200.63360428  19.8794006  101.90969337], target_pos: [ 0.0239 -0.2005  1.5526]
-[DEBUG] aprilag_visible: True
-[DEBUG] joint_0-5: 27513, 9209, -24489, 26428, 3186, -36652
-[DEBUG] gripper_cmd: 814011
-[DEBUG] camera_pos (tag_pos): [0.07704459 0.13479487 1.17286817]
-[DEBUG] offset_m: [200.55665836  19.74480207 100.73838048]
-[DEBUG] robot_pos: [200.63370295  19.87959694 101.91124865]
-[DEBUG] obj_pos: [200.63370295  19.87959694 101.91124865], target_pos: [ 0.0239 -0.2005  1.5526]
-[DEBUG] aprilag_visible: True
-[DEBUG] camera_pos (tag_pos): [0.07702024 0.13476973 1.17257933]
-[DEBUG] offset_m: [200.55665836  19.74480207 100.73838048]
-[DEBUG] robot_pos: [200.6336786   19.8795718  101.91095981]
-[Step   4] Reward:   0.00 | Episode Reward:   0.00 | Obj->Target: 225.2096m | Success: ❌
-[DEBUG] joint_0-5: 29694, 7433, -24155, 22135, 284, -36998
-[DEBUG] gripper_cmd: 129181
-[DEBUG] camera_pos (tag_pos): [0.07700952 0.1347421  1.17239982]
-[DEBUG] offset_m: [200.55665836  19.74480207 100.73838048]
-[DEBUG] robot_pos: [200.63366788  19.87954417 101.9107803 ]
-[DEBUG] obj_pos: [200.63366788  19.87954417 101.9107803 ], target_pos: [ 0.0239 -0.2005  1.5526]
-[DEBUG] aprilag_visible: True
-[DEBUG] joint_0-5: 31875, 5657, -23822, 17842, -2617, -37345
-[DEBUG] gripper_cmd: 129181
-[DEBUG] camera_pos (tag_pos): [0.07702978 0.13476322 1.17252067]
-[DEBUG] offset_m: [200.55665836  19.74480207 100.73838048]
-[DEBUG] robot_pos: [200.63368814  19.87956529 101.91090115]
-[DEBUG] obj_pos: [200.63368814  19.87956529 101.91090115], target_pos: [ 0.0239 -0.2005  1.5526]
-[DEBUG] aprilag_visible: True
-[DEBUG] camera_pos (tag_pos): [0.07693572 0.13461011 1.1712349 ]
-[DEBUG] offset_m: [200.55665836  19.74480207 100.73838048]
-[DEBUG] robot_pos: [200.63359408  19.87941217 101.90961538]
-[Step   5] Reward:   0.00 | Episode Reward:   0.00 | Obj->Target: 225.2094m | Success: ❌
-[DEBUG] joint_0-5: 31136, 6880, -28904, 13816, -998, -35499
-[DEBUG] gripper_cmd: 807560
-[DEBUG] camera_pos (tag_pos): [0.07694493 0.13465284 1.17158207]
-[DEBUG] offset_m: [200.55665836  19.74480207 100.73838048]
-[DEBUG] robot_pos: [200.6336033   19.87945491 101.90996255]
-[DEBUG] obj_pos: [200.6336033   19.87945491 101.90996255], target_pos: [ 0.0239 -0.2005  1.5526]
-[DEBUG] aprilag_visible: True
-[DEBUG] joint_0-5: 30397, 8103, -33987, 9789, 621, -33654
-[DEBUG] gripper_cmd: 807560
-[DEBUG] camera_pos (tag_pos): [0.07695878 0.13463464 1.17138471]
-[DEBUG] offset_m: [200.55665836  19.74480207 100.73838048]
-[DEBUG] robot_pos: [200.63361715  19.87943671 101.90976519]
-[DEBUG] obj_pos: [200.63361715  19.87943671 101.90976519], target_pos: [ 0.0239 -0.2005  1.5526]
-[DEBUG] aprilag_visible: True
-[DEBUG] camera_pos (tag_pos): [0.07701979 0.13474155 1.17239013]
-[DEBUG] offset_m: [200.55665836  19.74480207 100.73838048]
-[DEBUG] robot_pos: [200.63367816  19.87954361 101.91077062]
-[Step   6] Reward:   0.00 | Episode Reward:   0.00 | Obj->Target: 225.2088m | Success: ❌
-[DEBUG] joint_0-5: 25099, 8419, -31127, 9359, 6140, -37798
-[DEBUG] gripper_cmd: 394398
-[DEBUG] camera_pos (tag_pos): [0.07701243 0.13480607 1.17275531]
-[DEBUG] offset_m: [200.55665836  19.74480207 100.73838048]
-[DEBUG] robot_pos: [200.6336708   19.87960814 101.91113579]
-[DEBUG] obj_pos: [200.6336708   19.87960814 101.91113579], target_pos: [ 0.0239 -0.2005  1.5526]
-[DEBUG] aprilag_visible: True
-[DEBUG] joint_0-5: 19800, 8735, -28266, 8928, 11660, -41942
-[DEBUG] gripper_cmd: 394398
-[DEBUG] camera_pos (tag_pos): [0.07695487 0.13464343 1.17161433]
-[DEBUG] offset_m: [200.55665836  19.74480207 100.73838048]
-[DEBUG] robot_pos: [200.63361323  19.8794455  101.90999481]
-[DEBUG] obj_pos: [200.63361323  19.8794455  101.90999481], target_pos: [ 0.0239 -0.2005  1.5526]
-[DEBUG] aprilag_visible: True
-[DEBUG] camera_pos (tag_pos): [0.07701482 0.13473655 1.17234835]
-[DEBUG] offset_m: [200.55665836  19.74480207 100.73838048]
-[DEBUG] robot_pos: [200.63367318  19.87953861 101.91072883]
-[Step   7] Reward:   0.00 | Episode Reward:   0.00 | Obj->Target: 225.2089m | Success: ❌
-[DEBUG] joint_0-5: 20232, 11459, -33269, 9765, 7730, -42478
-[DEBUG] gripper_cmd: 195567
-[DEBUG] camera_pos (tag_pos): [0.07694946 0.13466504 1.17156799]
-[DEBUG] offset_m: [200.55665836  19.74480207 100.73838048]
-[DEBUG] robot_pos: [200.63360782  19.8794671  101.90994847]
-[DEBUG] obj_pos: [200.63360782  19.8794671  101.90994847], target_pos: [ 0.0239 -0.2005  1.5526]
-[DEBUG] aprilag_visible: True
-[DEBUG] joint_0-5: 20664, 14183, -38272, 10602, 3800, -43015
-[DEBUG] gripper_cmd: 195567
-[DEBUG] camera_pos (tag_pos): [0.07704742 0.13485723 1.17319992]
-[DEBUG] offset_m: [200.55665836  19.74480207 100.73838048]
-[DEBUG] robot_pos: [200.63370578  19.87965929 101.91158041]
-[DEBUG] obj_pos: [200.63370578  19.87965929 101.91158041], target_pos: [ 0.0239 -0.2005  1.5526]
-[DEBUG] aprilag_visible: True
-[DEBUG] camera_pos (tag_pos): [0.07699783 0.13473789 1.17231848]
-[DEBUG] offset_m: [200.55665836  19.74480207 100.73838048]
-[DEBUG] robot_pos: [200.63365619  19.87953996 101.91069896]
-[Step   8] Reward:   0.00 | Episode Reward:   0.00 | Obj->Target: 225.2098m | Success: ❌
-[DEBUG] joint_0-5: 24554, 12479, -43980, 5047, 3783, -37984
-[DEBUG] gripper_cmd: 93309
-[DEBUG] camera_pos (tag_pos): [0.07698673 0.13472701 1.17219213]
-[DEBUG] offset_m: [200.55665836  19.74480207 100.73838048]
-[DEBUG] robot_pos: [200.63364509  19.87952907 101.91057261]
-[DEBUG] obj_pos: [200.63364509  19.87952907 101.91057261], target_pos: [ 0.0239 -0.2005  1.5526]
-[DEBUG] aprilag_visible: True
-[DEBUG] joint_0-5: 28445, 10775, -49689, -508, 3765, -32953
-[DEBUG] gripper_cmd: 93309
-[DEBUG] camera_pos (tag_pos): [0.07703397 0.13482804 1.17296134]
-[DEBUG] offset_m: [200.55665836  19.74480207 100.73838048]
-[DEBUG] robot_pos: [200.63369234  19.87963011 101.91134183]
-[DEBUG] obj_pos: [200.63369234  19.87963011 101.91134183], target_pos: [ 0.0239 -0.2005  1.5526]
-[DEBUG] aprilag_visible: True
-[DEBUG] camera_pos (tag_pos): [0.07701132 0.13475422 1.17246566]
-[DEBUG] offset_m: [200.55665836  19.74480207 100.73838048]
-[DEBUG] robot_pos: [200.63366968  19.87955629 101.91084614]
-[Step   9] Reward:   0.00 | Episode Reward:   0.00 | Obj->Target: 225.2096m | Success: ❌
-[DEBUG] joint_0-5: 29101, 14238, -54745, -5459, 8214, -38150
-[DEBUG] gripper_cmd: 122233
-[DEBUG] camera_pos (tag_pos): [0.07699886 0.13472076 1.1721595 ]
-[DEBUG] offset_m: [200.55665836  19.74480207 100.73838048]
-[DEBUG] robot_pos: [200.63365723  19.87952282 101.91053998]
-[DEBUG] obj_pos: [200.63365723  19.87952282 101.91053998], target_pos: [ 0.0239 -0.2005  1.5526]
-[DEBUG] aprilag_visible: True
-[DEBUG] joint_0-5: 29757, 17700, -59802, -10410, 12663, -43347
-[DEBUG] gripper_cmd: 122233
-[DEBUG] camera_pos (tag_pos): [0.0770149  0.13476046 1.17245828]
-[DEBUG] offset_m: [200.55665836  19.74480207 100.73838048]
-[DEBUG] robot_pos: [200.63367326  19.87956252 101.91083876]
-[DEBUG] obj_pos: [200.63367326  19.87956252 101.91083876], target_pos: [ 0.0239 -0.2005  1.5526]
-[DEBUG] aprilag_visible: True
-[DEBUG] camera_pos (tag_pos): [0.07700529 0.13473219 1.17225604]
-[DEBUG] offset_m: [200.55665836  19.74480207 100.73838048]
-[DEBUG] robot_pos: [200.63366366  19.87953426 101.91063652]
-[Step  10] Reward:   0.00 | Episode Reward:   0.00 | Obj->Target: 225.2094m | Success: ❌
-[DEBUG] joint_0-5: 33525, 20649, -54112, -9994, 12869, -46683
-[DEBUG] gripper_cmd: 39093
-[DEBUG] camera_pos (tag_pos): [0.07693987 0.13465475 1.1716596 ]
-[DEBUG] offset_m: [200.55665836  19.74480207 100.73838048]
-[DEBUG] robot_pos: [200.63359823  19.87945681 101.91004008]
-[DEBUG] obj_pos: [200.63359823  19.87945681 101.91004008], target_pos: [ 0.0239 -0.2005  1.5526]
-[DEBUG] aprilag_visible: True
-[DEBUG] joint_0-5: 37294, 23599, -48423, -9579, 13075, -50018
-[DEBUG] gripper_cmd: 39093
-[DEBUG] camera_pos (tag_pos): [0.07693356 0.13464631 1.17152276]
-[DEBUG] offset_m: [200.55665836  19.74480207 100.73838048]
-[DEBUG] robot_pos: [200.63359192  19.87944838 101.90990324]
-[DEBUG] obj_pos: [200.63359192  19.87944838 101.90990324], target_pos: [ 0.0239 -0.2005  1.5526]
-[DEBUG] aprilag_visible: True
-[DEBUG] camera_pos (tag_pos): [0.07696892 0.13466026 1.1717986 ]
-[DEBUG] offset_m: [200.55665836  19.74480207 100.73838048]
-[DEBUG] robot_pos: [200.63362728  19.87946233 101.91017908]
-[Step  11] Reward:   0.00 | Episode Reward:   0.00 | Obj->Target: 225.2089m | Success: ❌
-[DEBUG] joint_0-5: 35265, 18125, -44802, -4344, 15626, -47095
-[DEBUG] gripper_cmd: 590291
-[DEBUG] camera_pos (tag_pos): [0.07697982 0.1346835  1.17190863]
-[DEBUG] offset_m: [200.55665836  19.74480207 100.73838048]
-[DEBUG] robot_pos: [200.63363818  19.87948557 101.91028911]
-[DEBUG] obj_pos: [200.63363818  19.87948557 101.91028911], target_pos: [ 0.0239 -0.2005  1.5526]
-[DEBUG] aprilag_visible: True
-[DEBUG] joint_0-5: 33236, 12650, -41182, 891, 18176, -44172
-[DEBUG] gripper_cmd: 590291
-[DEBUG] camera_pos (tag_pos): [0.0770383  0.13482369 1.17306004]
-[DEBUG] offset_m: [200.55665836  19.74480207 100.73838048]
-[DEBUG] robot_pos: [200.63369667  19.87962576 101.91144052]
-[DEBUG] obj_pos: [200.63369667  19.87962576 101.91144052], target_pos: [ 0.0239 -0.2005  1.5526]
-[DEBUG] aprilag_visible: True
-[DEBUG] camera_pos (tag_pos): [0.07690119 0.13456424 1.17098928]
-[DEBUG] offset_m: [200.55665836  19.74480207 100.73838048]
-[DEBUG] robot_pos: [200.63355955  19.87936631 101.90936977]
-[Step  12] Reward:   0.00 | Episode Reward:   0.00 | Obj->Target: 225.2097m | Success: ❌
-[DEBUG] joint_0-5: 28104, 13818, -43213, 3046, 17964, -41566
-[DEBUG] gripper_cmd: 354453
-[DEBUG] camera_pos (tag_pos): [0.07693281 0.13461733 1.17132276]
-[DEBUG] offset_m: [200.55665836  19.74480207 100.73838048]
-[DEBUG] robot_pos: [200.63359117  19.8794194  101.90970324]
-[DEBUG] obj_pos: [200.63359117  19.8794194  101.90970324], target_pos: [ 0.0239 -0.2005  1.5526]
-[DEBUG] aprilag_visible: True
-[DEBUG] joint_0-5: 22972, 14985, -45245, 5201, 17751, -38961
-[DEBUG] gripper_cmd: 354453
-[DEBUG] camera_pos (tag_pos): [0.07697697 0.13470782 1.17219066]
-[DEBUG] offset_m: [200.55665836  19.74480207 100.73838048]
-[DEBUG] robot_pos: [200.63363533  19.87950989 101.91057114]
-[DEBUG] obj_pos: [200.63363533  19.87950989 101.91057114], target_pos: [ 0.0239 -0.2005  1.5526]
-[DEBUG] aprilag_visible: True
-[DEBUG] camera_pos (tag_pos): [0.0770215  0.13475676 1.1725482 ]
-[DEBUG] offset_m: [200.55665836  19.74480207 100.73838048]
-[DEBUG] robot_pos: [200.63367987  19.87955883 101.91092868]
-[Step  13] Reward:   0.00 | Episode Reward:   0.00 | Obj->Target: 225.2092m | Success: ❌
-[DEBUG] joint_0-5: 28696, 20044, -47414, 9452, 23009, -37334
-[DEBUG] gripper_cmd: 638867
-[DEBUG] camera_pos (tag_pos): [0.07701065 0.13474349 1.17241747]
-[DEBUG] offset_m: [200.55665836  19.74480207 100.73838048]
-[DEBUG] robot_pos: [200.63366902  19.87954556 101.91079795]
-[DEBUG] obj_pos: [200.63366902  19.87954556 101.91079795], target_pos: [ 0.0239 -0.2005  1.5526]
-[DEBUG] aprilag_visible: True
-[DEBUG] joint_0-5: 34421, 25103, -49584, 13702, 28267, -35707
-[DEBUG] gripper_cmd: 638867
-[DEBUG] camera_pos (tag_pos): [0.0770008  0.13477104 1.17251343]
-[DEBUG] offset_m: [200.55665836  19.74480207 100.73838048]
-[DEBUG] robot_pos: [200.63365916  19.87957311 101.91089391]
-[DEBUG] obj_pos: [200.63365916  19.87957311 101.91089391], target_pos: [ 0.0239 -0.2005  1.5526]
-[DEBUG] aprilag_visible: True
-[DEBUG] camera_pos (tag_pos): [0.077003   0.13473079 1.17238344]
-[DEBUG] offset_m: [200.55665836  19.74480207 100.73838048]
-[DEBUG] robot_pos: [200.63366136  19.87953286 101.91076392]
-[Step  14] Reward:   0.00 | Episode Reward:   0.00 | Obj->Target: 225.2094m | Success: ❌
-[DEBUG] joint_0-5: 29578, 19684, -55030, 16030, 23434, -32990
-[DEBUG] gripper_cmd: 176454
-[DEBUG] camera_pos (tag_pos): [0.07695798 0.13465213 1.17171007]
-[DEBUG] offset_m: [200.55665836  19.74480207 100.73838048]
-[DEBUG] robot_pos: [200.63361634  19.87945419 101.91009055]
-[DEBUG] obj_pos: [200.63361634  19.87945419 101.91009055], target_pos: [ 0.0239 -0.2005  1.5526]
-[DEBUG] aprilag_visible: True
-[DEBUG] joint_0-5: 24734, 14265, -60475, 18358, 18602, -30272
-[DEBUG] gripper_cmd: 176454
-[DEBUG] camera_pos (tag_pos): [0.07694777 0.1346745  1.17178732]
-[DEBUG] offset_m: [200.55665836  19.74480207 100.73838048]
-[DEBUG] robot_pos: [200.63360613  19.87947657 101.91016781]
-[DEBUG] obj_pos: [200.63360613  19.87947657 101.91016781], target_pos: [ 0.0239 -0.2005  1.5526]
-[DEBUG] aprilag_visible: True
-[DEBUG] camera_pos (tag_pos): [0.07696509 0.1346463  1.17170393]
-[DEBUG] offset_m: [200.55665836  19.74480207 100.73838048]
-[DEBUG] robot_pos: [200.63362345  19.87944837 101.91008441]
-[Step  15] Reward:   0.00 | Episode Reward:   0.00 | Obj->Target: 225.2090m | Success: ❌
-[DEBUG] joint_0-5: 26857, 19152, -65861, 21815, 20624, -33248
-[DEBUG] gripper_cmd: 227886
-[DEBUG] camera_pos (tag_pos): [0.0769152  0.13460712 1.17124746]
-[DEBUG] offset_m: [200.55665836  19.74480207 100.73838048]
-[DEBUG] robot_pos: [200.63357356  19.87940918 101.90962794]
-[DEBUG] obj_pos: [200.63357356  19.87940918 101.90962794], target_pos: [ 0.0239 -0.2005  1.5526]
-[DEBUG] aprilag_visible: True
-[DEBUG] joint_0-5: 28981, 24040, -71247, 25272, 22647, -36225
-[DEBUG] gripper_cmd: 227886
-[DEBUG] camera_pos (tag_pos): [0.07699779 0.13474783 1.17239025]
-[DEBUG] offset_m: [200.55665836  19.74480207 100.73838048]
-[DEBUG] robot_pos: [200.63365615  19.8795499  101.91077073]
-[DEBUG] obj_pos: [200.63365615  19.8795499  101.91077073], target_pos: [ 0.0239 -0.2005  1.5526]
-[DEBUG] aprilag_visible: True
-[DEBUG] camera_pos (tag_pos): [0.07707647 0.1348715  1.17347899]
-[DEBUG] offset_m: [200.55665836  19.74480207 100.73838048]
-[DEBUG] robot_pos: [200.63373483  19.87967357 101.91185947]
-[Step  16] Reward:   0.00 | Episode Reward:   0.00 | Obj->Target: 225.2093m | Success: ❌
-[DEBUG] joint_0-5: 34176, 22274, -68527, 23399, 16962, -41474
-[DEBUG] gripper_cmd: 520485
-[DEBUG] camera_pos (tag_pos): [0.07702824 0.13479621 1.17287911]
-[DEBUG] offset_m: [200.55665836  19.74480207 100.73838048]
-[DEBUG] robot_pos: [200.6336866   19.87959828 101.91125959]
-[DEBUG] obj_pos: [200.6336866   19.87959828 101.91125959], target_pos: [ 0.0239 -0.2005  1.5526]
-[DEBUG] aprilag_visible: True
-[DEBUG] joint_0-5: 39371, 20508, -65808, 21525, 11278, -46724
-[DEBUG] gripper_cmd: 520485
-[DEBUG] camera_pos (tag_pos): [0.07701633 0.1347384  1.17247823]
-[DEBUG] offset_m: [200.55665836  19.74480207 100.73838048]
-[DEBUG] robot_pos: [200.63367469  19.87954047 101.91085871]
-[DEBUG] obj_pos: [200.63367469  19.87954047 101.91085871], target_pos: [ 0.0239 -0.2005  1.5526]
-[DEBUG] aprilag_visible: True
-[DEBUG] camera_pos (tag_pos): [0.07698943 0.13472291 1.17233199]
-[DEBUG] offset_m: [200.55665836  19.74480207 100.73838048]
-[DEBUG] robot_pos: [200.6336478   19.87952498 101.91071247]
-[Step  17] Reward:   0.00 | Episode Reward:   0.00 | Obj->Target: 225.2094m | Success: ❌
-[DEBUG] joint_0-5: 33727, 15568, -67109, 17749, 8501, -45551
-[DEBUG] gripper_cmd: 801408
-[DEBUG] camera_pos (tag_pos): [0.07693842 0.13463569 1.17159242]
-[DEBUG] offset_m: [200.55665836  19.74480207 100.73838048]
-[DEBUG] robot_pos: [200.63359679  19.87943776 101.9099729 ]
-[DEBUG] obj_pos: [200.63359679  19.87943776 101.9099729 ], target_pos: [ 0.0239 -0.2005  1.5526]
-[DEBUG] aprilag_visible: True
-[DEBUG] joint_0-5: 28083, 10628, -68410, 13972, 5723, -44378
-[DEBUG] gripper_cmd: 801408
-[DEBUG] camera_pos (tag_pos): [0.0769561  0.13462197 1.17143474]
-[DEBUG] offset_m: [200.55665836  19.74480207 100.73838048]
-[DEBUG] robot_pos: [200.63361447  19.87942404 101.90981522]
-[DEBUG] obj_pos: [200.63361447  19.87942404 101.90981522], target_pos: [ 0.0239 -0.2005  1.5526]
-[DEBUG] aprilag_visible: True
-[DEBUG] camera_pos (tag_pos): [0.07697279 0.13468847 1.17197753]
-[DEBUG] offset_m: [200.55665836  19.74480207 100.73838048]
-[DEBUG] robot_pos: [200.63363116  19.87949054 101.91035802]
-[Step  18] Reward:   0.00 | Episode Reward:   0.00 | Obj->Target: 225.2089m | Success: ❌
-[DEBUG] joint_0-5: 33408, 5088, -71572, 15940, 1699, -39752
-[DEBUG] gripper_cmd: 418374
-[DEBUG] camera_pos (tag_pos): [0.07695728 0.13467613 1.17181446]
-[DEBUG] offset_m: [200.55665836  19.74480207 100.73838048]
-[DEBUG] robot_pos: [200.63361564  19.87947819 101.91019494]
-[DEBUG] obj_pos: [200.63361564  19.87947819 101.91019494], target_pos: [ 0.0239 -0.2005  1.5526]
-[DEBUG] aprilag_visible: True
-[DEBUG] joint_0-5: 38733, -453, -74734, 17908, -2325, -35126
-[DEBUG] gripper_cmd: 418374
-[DEBUG] camera_pos (tag_pos): [0.07695951 0.13467701 1.17188596]
-[DEBUG] offset_m: [200.55665836  19.74480207 100.73838048]
-[DEBUG] robot_pos: [200.63361787  19.87947908 101.91026644]
-[DEBUG] obj_pos: [200.63361787  19.87947908 101.91026644], target_pos: [ 0.0239 -0.2005  1.5526]
-[DEBUG] aprilag_visible: True
-[DEBUG] camera_pos (tag_pos): [0.07701456 0.1347767  1.17262578]
-[DEBUG] offset_m: [200.55665836  19.74480207 100.73838048]
-[DEBUG] robot_pos: [200.63367292  19.87957877 101.91100627]
-[Step  19] Reward:   0.00 | Episode Reward:   0.00 | Obj->Target: 225.2091m | Success: ❌
-[DEBUG] joint_0-5: 43993, -4329, -80179, 14586, -4070, -36242
-[DEBUG] gripper_cmd: 346245
-[DEBUG] camera_pos (tag_pos): [0.07696659 0.13469427 1.17204313]
-[DEBUG] offset_m: [200.55665836  19.74480207 100.73838048]
-[DEBUG] robot_pos: [200.63362495  19.87949633 101.91042361]
-[DEBUG] obj_pos: [200.63362495  19.87949633 101.91042361], target_pos: [ 0.0239 -0.2005  1.5526]
-[DEBUG] aprilag_visible: True
-[DEBUG] joint_0-5: 49254, -8205, -85624, 11263, -5814, -37358
-[DEBUG] gripper_cmd: 346245
-[DEBUG] camera_pos (tag_pos): [0.07697499 0.13466553 1.17179744]
-[DEBUG] offset_m: [200.55665836  19.74480207 100.73838048]
-[DEBUG] robot_pos: [200.63363335  19.8794676  101.91017792]
-[DEBUG] obj_pos: [200.63363335  19.8794676  101.91017792], target_pos: [ 0.0239 -0.2005  1.5526]
-[DEBUG] aprilag_visible: True
-[DEBUG] camera_pos (tag_pos): [0.07700876 0.13477554 1.17264348]
-[DEBUG] offset_m: [200.55665836  19.74480207 100.73838048]
-[DEBUG] robot_pos: [200.63366713  19.87957761 101.91102396]
-[Step  20] Reward:   0.00 | Episode Reward:   0.00 | Obj->Target: 225.2090m | Success: ❌
-[DEBUG] joint_0-5: 46236, -11947, -82554, 10162, -7183, -36839
-[DEBUG] gripper_cmd: 423720
-[DEBUG] camera_pos (tag_pos): [0.07692377 0.13460635 1.17135025]
-[DEBUG] offset_m: [200.55665836  19.74480207 100.73838048]
-[DEBUG] robot_pos: [200.63358214  19.87940842 101.90973073]
-[DEBUG] obj_pos: [200.63358214  19.87940842 101.90973073], target_pos: [ 0.0239 -0.2005  1.5526]
-[DEBUG] aprilag_visible: True
-[DEBUG] joint_0-5: 43218, -15690, -79484, 9060, -8553, -36320
-[DEBUG] gripper_cmd: 423720
-[DEBUG] camera_pos (tag_pos): [0.07702287 0.13475976 1.17256326]
-[DEBUG] offset_m: [200.55665836  19.74480207 100.73838048]
-[DEBUG] robot_pos: [200.63368123  19.87956183 101.91094374]
-[DEBUG] obj_pos: [200.63368123  19.87956183 101.91094374], target_pos: [ 0.0239 -0.2005  1.5526]
-[DEBUG] aprilag_visible: True
-[DEBUG] camera_pos (tag_pos): [0.07700941 0.13471359 1.17226099]
-[DEBUG] offset_m: [200.55665836  19.74480207 100.73838048]
-[DEBUG] robot_pos: [200.63366778  19.87951566 101.91064147]
-[Step  21] Reward:   0.00 | Episode Reward:   0.00 | Obj->Target: 225.2094m | Success: ❌
-[DEBUG] joint_0-5: 48265, -15844, -85008, 7610, -4493, -31373
-[DEBUG] gripper_cmd: 919470
-[DEBUG] camera_pos (tag_pos): [0.07694622 0.13463758 1.17151418]
-[DEBUG] offset_m: [200.55665836  19.74480207 100.73838048]
-[DEBUG] robot_pos: [200.63360458  19.87943964 101.90989466]
-[DEBUG] obj_pos: [200.63360458  19.87943964 101.90989466], target_pos: [ 0.0239 -0.2005  1.5526]
-[DEBUG] aprilag_visible: True
-[DEBUG] joint_0-5: 53312, -15997, -90533, 6160, -433, -26425
-[DEBUG] gripper_cmd: 919470
-[DEBUG] camera_pos (tag_pos): [0.07696938 0.13468562 1.17185326]
-[DEBUG] offset_m: [200.55665836  19.74480207 100.73838048]
-[DEBUG] robot_pos: [200.63362775  19.87948769 101.91023374]
-[DEBUG] obj_pos: [200.63362775  19.87948769 101.91023374], target_pos: [ 0.0239 -0.2005  1.5526]
-[DEBUG] aprilag_visible: True
-[DEBUG] camera_pos (tag_pos): [0.07701954 0.13473253 1.17240952]
-[DEBUG] offset_m: [200.55665836  19.74480207 100.73838048]
-[DEBUG] robot_pos: [200.6336779  19.8795346 101.91079  ]
-[Step  22] Reward:   0.00 | Episode Reward:   0.00 | Obj->Target: 225.2091m | Success: ❌
-[DEBUG] joint_0-5: 56953, -19009, -94739, 7163, -4856, -23649
-[DEBUG] gripper_cmd: 18065
-[DEBUG] camera_pos (tag_pos): [0.07694814 0.1346227  1.17148558]
-[DEBUG] offset_m: [200.55665836  19.74480207 100.73838048]
-[DEBUG] robot_pos: [200.63360651  19.87942477 101.90986606]
-[DEBUG] obj_pos: [200.63360651  19.87942477 101.90986606], target_pos: [ 0.0239 -0.2005  1.5526]
-[DEBUG] aprilag_visible: True
-[DEBUG] joint_0-5: 60594, -22020, -98944, 8166, -9280, -20873
-[DEBUG] gripper_cmd: 18065
-[DEBUG] camera_pos (tag_pos): [0.07698055 0.13468512 1.17199526]
-[DEBUG] offset_m: [200.55665836  19.74480207 100.73838048]
-[DEBUG] robot_pos: [200.63363891  19.87948719 101.91037574]
-[DEBUG] obj_pos: [200.63363891  19.87948719 101.91037574], target_pos: [ 0.0239 -0.2005  1.5526]
-[DEBUG] aprilag_visible: True
-[DEBUG] camera_pos (tag_pos): [0.07701197 0.13475228 1.17250902]
-[DEBUG] offset_m: [200.55665836  19.74480207 100.73838048]
-[DEBUG] robot_pos: [200.63367033  19.87955435 101.9108895 ]
-[Step  23] Reward:   0.00 | Episode Reward:   0.00 | Obj->Target: 225.2091m | Success: ❌
-[DEBUG] joint_0-5: 61413, -19218, -93950, 4216, -9036, -22217
-[DEBUG] gripper_cmd: 229459
-[DEBUG] camera_pos (tag_pos): [0.07699834 0.13475205 1.17249483]
-[DEBUG] offset_m: [200.55665836  19.74480207 100.73838048]
-[DEBUG] robot_pos: [200.6336567   19.87955412 101.91087532]
-[DEBUG] obj_pos: [200.6336567   19.87955412 101.91087532], target_pos: [ 0.0239 -0.2005  1.5526]
-[DEBUG] aprilag_visible: True
-[DEBUG] joint_0-5: 62233, -16415, -88957, 266, -8792, -23561
-[DEBUG] gripper_cmd: 229459
-[DEBUG] camera_pos (tag_pos): [0.07686622 0.13449993 1.1704383 ]
-[DEBUG] offset_m: [200.55665836  19.74480207 100.73838048]
-[DEBUG] robot_pos: [200.63352458  19.879302   101.90881878]
-[DEBUG] obj_pos: [200.63352458  19.879302   101.90881878], target_pos: [ 0.0239 -0.2005  1.5526]
-[DEBUG] aprilag_visible: True
-[DEBUG] camera_pos (tag_pos): [0.07697931 0.13471137 1.17210513]
-[DEBUG] offset_m: [200.55665836  19.74480207 100.73838048]
-[DEBUG] robot_pos: [200.63363767  19.87951344 101.91048561]
-[Step  24] Reward:   0.00 | Episode Reward:   0.00 | Obj->Target: 225.2083m | Success: ❌
-[DEBUG] joint_0-5: 64997, -16605, -94211, 260, -5580, -22409
-[DEBUG] gripper_cmd: 145864
-[DEBUG] camera_pos (tag_pos): [0.07694414 0.13463958 1.17161579]
-[DEBUG] offset_m: [200.55665836  19.74480207 100.73838048]
-[DEBUG] robot_pos: [200.6336025   19.87944165 101.90999627]
-[DEBUG] obj_pos: [200.6336025   19.87944165 101.90999627], target_pos: [ 0.0239 -0.2005  1.5526]
-[DEBUG] aprilag_visible: True
-[DEBUG] joint_0-5: 67761, -16795, -99466, 254, -2367, -21257
-[DEBUG] gripper_cmd: 145864
-[DEBUG] camera_pos (tag_pos): [0.07695912 0.13468165 1.17184048]
-[DEBUG] offset_m: [200.55665836  19.74480207 100.73838048]
-[DEBUG] robot_pos: [200.63361749  19.87948371 101.91022096]
-[DEBUG] obj_pos: [200.63361749  19.87948371 101.91022096], target_pos: [ 0.0239 -0.2005  1.5526]
-[DEBUG] aprilag_visible: True
-[DEBUG] camera_pos (tag_pos): [0.07695851 0.13464883 1.17171502]
-[DEBUG] offset_m: [200.55665836  19.74480207 100.73838048]
-[DEBUG] robot_pos: [200.63361687  19.87945089 101.9100955 ]
-[Step  25] Reward:   0.00 | Episode Reward:   0.00 | Obj->Target: 225.2091m | Success: ❌
-[DEBUG] joint_0-5: 71572, -12245, -100220, 2614, -2708, -23073
-[DEBUG] gripper_cmd: 555255
-[DEBUG] camera_pos (tag_pos): [0.07701511 0.13475155 1.17262364]
-[DEBUG] offset_m: [200.55665836  19.74480207 100.73838048]
-[DEBUG] robot_pos: [200.63367347  19.87955362 101.91100413]
-[DEBUG] obj_pos: [200.63367347  19.87955362 101.91100413], target_pos: [ 0.0239 -0.2005  1.5526]
-[DEBUG] aprilag_visible: True
-[DEBUG] joint_0-5: 75384, -7696, -100973, 4974, -3049, -24890
-[DEBUG] gripper_cmd: 555255
-[DEBUG] camera_pos (tag_pos): [0.07694962 0.13464248 1.17161964]
-[DEBUG] offset_m: [200.55665836  19.74480207 100.73838048]
-[DEBUG] robot_pos: [200.63360798  19.87944455 101.91000012]
-[DEBUG] obj_pos: [200.63360798  19.87944455 101.91000012], target_pos: [ 0.0239 -0.2005  1.5526]
-[DEBUG] aprilag_visible: True
-[DEBUG] camera_pos (tag_pos): [0.07697895 0.13469525 1.17194398]
-[DEBUG] offset_m: [200.55665836  19.74480207 100.73838048]
-[DEBUG] robot_pos: [200.63363732  19.87949732 101.91032446]
-[Step  26] Reward:   0.00 | Episode Reward:   0.00 | Obj->Target: 225.2089m | Success: ❌
-[DEBUG] joint_0-5: 71663, -4095, -98995, 6475, -8035, -19422
-[DEBUG] gripper_cmd: 337474
-[DEBUG] camera_pos (tag_pos): [0.0770064  0.13476436 1.17251484]
-[DEBUG] offset_m: [200.55665836  19.74480207 100.73838048]
-[DEBUG] robot_pos: [200.63366477  19.87956643 101.91089532]
-[DEBUG] obj_pos: [200.63366477  19.87956643 101.91089532], target_pos: [ 0.0239 -0.2005  1.5526]
-[DEBUG] aprilag_visible: True
-[DEBUG] joint_0-5: 67942, -495, -97017, 7977, -13021, -13955
-[DEBUG] gripper_cmd: 337474
-[DEBUG] camera_pos (tag_pos): [0.07693124 0.13462317 1.17142945]
-[DEBUG] offset_m: [200.55665836  19.74480207 100.73838048]
-[DEBUG] robot_pos: [200.6335896   19.87942523 101.90980993]
-[DEBUG] obj_pos: [200.6335896   19.87942523 101.90980993], target_pos: [ 0.0239 -0.2005  1.5526]
-[DEBUG] aprilag_visible: True
-[DEBUG] camera_pos (tag_pos): [0.07698743 0.13470255 1.17213871]
-[DEBUG] offset_m: [200.55665836  19.74480207 100.73838048]
-[DEBUG] robot_pos: [200.63364579  19.87950462 101.91051919]
-[Step  27] Reward:   0.00 | Episode Reward:   0.00 | Obj->Target: 225.2088m | Success: ❌
-[DEBUG] joint_0-5: 71615, -3935, -99105, 5816, -12693, -18668
-[DEBUG] gripper_cmd: 678061
-[DEBUG] camera_pos (tag_pos): [0.07697042 0.1347121  1.17207451]
-[DEBUG] offset_m: [200.55665836  19.74480207 100.73838048]
-[DEBUG] robot_pos: [200.63362879  19.87951416 101.91045499]
-[DEBUG] obj_pos: [200.63362879  19.87951416 101.91045499], target_pos: [ 0.0239 -0.2005  1.5526]
-[DEBUG] aprilag_visible: True
-[DEBUG] joint_0-5: 75288, -7374, -101193, 3655, -12364, -23382
-[DEBUG] gripper_cmd: 678061
-[DEBUG] camera_pos (tag_pos): [0.07700485 0.13475076 1.17234995]
-[DEBUG] offset_m: [200.55665836  19.74480207 100.73838048]
-[DEBUG] robot_pos: [200.63366321  19.87955283 101.91073043]
-[DEBUG] obj_pos: [200.63366321  19.87955283 101.91073043], target_pos: [ 0.0239 -0.2005  1.5526]
-[DEBUG] aprilag_visible: True
-[DEBUG] camera_pos (tag_pos): [0.07707603 0.13488556 1.17353416]
-[DEBUG] offset_m: [200.55665836  19.74480207 100.73838048]
-[DEBUG] robot_pos: [200.63373439  19.87968763 101.91191465]
-[Step  28] Reward:   0.00 | Episode Reward:   0.00 | Obj->Target: 225.2093m | Success: ❌
-[DEBUG] joint_0-5: 70256, -7442, -99531, 9362, -9370, -19957
-[DEBUG] gripper_cmd: 11710
-[DEBUG] camera_pos (tag_pos): [0.07693947 0.13463529 1.17160041]
-[DEBUG] offset_m: [200.55665836  19.74480207 100.73838048]
-[DEBUG] robot_pos: [200.63359783  19.87943736 101.9099809 ]
-[DEBUG] obj_pos: [200.63359783  19.87943736 101.9099809 ], target_pos: [ 0.0239 -0.2005  1.5526]
-[DEBUG] aprilag_visible: True
-[DEBUG] joint_0-5: 65225, -7510, -97870, 15069, -6375, -16533
-[DEBUG] gripper_cmd: 11710
-[DEBUG] camera_pos (tag_pos): [0.07691468 0.13459227 1.17120349]
-[DEBUG] offset_m: [200.55665836  19.74480207 100.73838048]
-[DEBUG] robot_pos: [200.63357304  19.87939434 101.90958397]
-[DEBUG] obj_pos: [200.63357304  19.87939434 101.90958397], target_pos: [ 0.0239 -0.2005  1.5526]
-[DEBUG] aprilag_visible: True
-[DEBUG] camera_pos (tag_pos): [0.0769636  0.13468254 1.17195041]
-[DEBUG] offset_m: [200.55665836  19.74480207 100.73838048]
-[DEBUG] robot_pos: [200.63362196  19.87948461 101.91033089]
-[Step  29] Reward:   0.00 | Episode Reward:   0.00 | Obj->Target: 225.2087m | Success: ❌
-[DEBUG] joint_0-5: 61097, -2920, -93835, 14676, -9517, -16133
-[DEBUG] gripper_cmd: 410536
-[DEBUG] camera_pos (tag_pos): [0.07695014 0.1346452  1.17169447]
-[DEBUG] offset_m: [200.55665836  19.74480207 100.73838048]
-[DEBUG] robot_pos: [200.6336085   19.87944727 101.91007495]
-[DEBUG] obj_pos: [200.6336085   19.87944727 101.91007495], target_pos: [ 0.0239 -0.2005  1.5526]
-[DEBUG] aprilag_visible: True
-[DEBUG] joint_0-5: 56970, 1671, -89801, 14283, -12658, -15734
-[DEBUG] gripper_cmd: 410536
-[DEBUG] camera_pos (tag_pos): [0.07706758 0.13484185 1.17323131]
-[DEBUG] offset_m: [200.55665836  19.74480207 100.73838048]
-[DEBUG] robot_pos: [200.63372594  19.87964392 101.91161179]
-[DEBUG] obj_pos: [200.63372594  19.87964392 101.91161179], target_pos: [ 0.0239 -0.2005  1.5526]
-[DEBUG] aprilag_visible: True
-[DEBUG] camera_pos (tag_pos): [0.07699046 0.13470545 1.1721434 ]
-[DEBUG] offset_m: [200.55665836  19.74480207 100.73838048]
-[DEBUG] robot_pos: [200.63364882  19.87950752 101.91052388]
-[Step  30] Reward:   0.00 | Episode Reward:   0.00 | Obj->Target: 225.2098m | Success: ❌
-[DEBUG] joint_0-5: 56758, 6941, -84498, 14819, -11412, -20678
-[DEBUG] gripper_cmd: 787860
-[DEBUG] camera_pos (tag_pos): [0.07693427 0.13459507 1.17128115]
-[DEBUG] offset_m: [200.55665836  19.74480207 100.73838048]
-[DEBUG] robot_pos: [200.63359263  19.87939713 101.90966163]
-[DEBUG] obj_pos: [200.63359263  19.87939713 101.90966163], target_pos: [ 0.0239 -0.2005  1.5526]
-[DEBUG] aprilag_visible: True
-[DEBUG] joint_0-5: 56547, 12211, -79195, 15356, -10165, -25623
-[DEBUG] gripper_cmd: 787860
-[DEBUG] camera_pos (tag_pos): [0.07696987 0.13465466 1.17176221]
-[DEBUG] offset_m: [200.55665836  19.74480207 100.73838048]
-[DEBUG] robot_pos: [200.63362823  19.87945673 101.91014269]
-[DEBUG] obj_pos: [200.63362823  19.87945673 101.91014269], target_pos: [ 0.0239 -0.2005  1.5526]
-[DEBUG] aprilag_visible: True
-[DEBUG] camera_pos (tag_pos): [0.07702102 0.13477819 1.17271466]
-[DEBUG] offset_m: [200.55665836  19.74480207 100.73838048]
-[DEBUG] robot_pos: [200.63367939  19.87958025 101.91109514]
-[Step  31] Reward:   0.00 | Episode Reward:   0.00 | Obj->Target: 225.2090m | Success: ❌
-[DEBUG] joint_0-5: 57319, 7183, -82595, 12661, -6462, -26103
-[DEBUG] gripper_cmd: 424492
-[DEBUG] camera_pos (tag_pos): [0.07693304 0.13461809 1.17140892]
-[DEBUG] offset_m: [200.55665836  19.74480207 100.73838048]
-[DEBUG] robot_pos: [200.6335914   19.87942016 101.9097894 ]
-[DEBUG] obj_pos: [200.6335914   19.87942016 101.9097894 ], target_pos: [ 0.0239 -0.2005  1.5526]
-[DEBUG] aprilag_visible: True
-[DEBUG] joint_0-5: 58091, 2155, -85995, 9966, -2760, -26583
-[DEBUG] gripper_cmd: 424492
-[DEBUG] camera_pos (tag_pos): [0.07688274 0.13454135 1.17083303]
-[DEBUG] offset_m: [200.55665836  19.74480207 100.73838048]
-[DEBUG] robot_pos: [200.6335411   19.87934342 101.90921351]
-[DEBUG] obj_pos: [200.6335411   19.87934342 101.90921351], target_pos: [ 0.0239 -0.2005  1.5526]
-[DEBUG] aprilag_visible: True
-[DEBUG] camera_pos (tag_pos): [0.07699816 0.13474672 1.17248919]
-[DEBUG] offset_m: [200.55665836  19.74480207 100.73838048]
-[DEBUG] robot_pos: [200.63365653  19.87954879 101.91086967]
-[Step  32] Reward:   0.00 | Episode Reward:   0.00 | Obj->Target: 225.2085m | Success: ❌
-[DEBUG] joint_0-5: 54066, 552, -86097, 9427, -4918, -22457
-[DEBUG] gripper_cmd: 94587
-[DEBUG] camera_pos (tag_pos): [0.07691955 0.13459026 1.17111458]
-[DEBUG] offset_m: [200.55665836  19.74480207 100.73838048]
-[DEBUG] robot_pos: [200.63357791  19.87939233 101.90949506]
-[DEBUG] obj_pos: [200.63357791  19.87939233 101.90949506], target_pos: [ 0.0239 -0.2005  1.5526]
-[DEBUG] aprilag_visible: True
-[DEBUG] joint_0-5: 50041, -1050, -86199, 8888, -7076, -18331
-[DEBUG] gripper_cmd: 94587
-[DEBUG] camera_pos (tag_pos): [0.07693825 0.13461165 1.17138385]
-[DEBUG] offset_m: [200.55665836  19.74480207 100.73838048]
-[DEBUG] robot_pos: [200.63359662  19.87941372 101.90976433]
-[DEBUG] obj_pos: [200.63359662  19.87941372 101.90976433], target_pos: [ 0.0239 -0.2005  1.5526]
-[DEBUG] aprilag_visible: True
-[DEBUG] camera_pos (tag_pos): [0.07696769 0.13470234 1.17209801]
-[DEBUG] offset_m: [200.55665836  19.74480207 100.73838048]
-[DEBUG] robot_pos: [200.63362605  19.87950441 101.91047849]
-[Step  33] Reward:   0.00 | Episode Reward:   0.00 | Obj->Target: 225.2088m | Success: ❌
-[DEBUG] joint_0-5: 54655, 2095, -84535, 6323, -8089, -20002
-[DEBUG] gripper_cmd: 311979
-[DEBUG] camera_pos (tag_pos): [0.07698621 0.13470932 1.17205345]
-[DEBUG] offset_m: [200.55665836  19.74480207 100.73838048]
-[DEBUG] robot_pos: [200.63364457  19.87951139 101.91043393]
-[DEBUG] obj_pos: [200.63364457  19.87951139 101.91043393], target_pos: [ 0.0239 -0.2005  1.5526]
-[DEBUG] aprilag_visible: True
-[DEBUG] joint_0-5: 59268, 5241, -82870, 3757, -9101, -21674
-[DEBUG] gripper_cmd: 311979
-[DEBUG] camera_pos (tag_pos): [0.07694091 0.13464303 1.17153936]
-[DEBUG] offset_m: [200.55665836  19.74480207 100.73838048]
-[DEBUG] robot_pos: [200.63359928  19.8794451  101.90991984]
-[DEBUG] obj_pos: [200.63359928  19.8794451  101.90991984], target_pos: [ 0.0239 -0.2005  1.5526]
-[DEBUG] aprilag_visible: True
-[DEBUG] camera_pos (tag_pos): [0.07696929 0.13469926 1.17204791]
-[DEBUG] offset_m: [200.55665836  19.74480207 100.73838048]
-[DEBUG] robot_pos: [200.63362765  19.87950133 101.9104284 ]
-[Step  34] Reward:   0.00 | Episode Reward:   0.00 | Obj->Target: 225.2089m | Success: ❌
-[DEBUG] joint_0-5: 56665, 8403, -84706, -557, -13729, -25559
-[DEBUG] gripper_cmd: 754862
-[DEBUG] camera_pos (tag_pos): [0.07704196 0.13480458 1.17285547]
-[DEBUG] offset_m: [200.55665836  19.74480207 100.73838048]
-[DEBUG] robot_pos: [200.63370032  19.87960665 101.91123595]
-[DEBUG] obj_pos: [200.63370032  19.87960665 101.91123595], target_pos: [ 0.0239 -0.2005  1.5526]
-[DEBUG] aprilag_visible: True
-[DEBUG] joint_0-5: 54062, 11564, -86541, -4871, -18356, -29445
-[DEBUG] gripper_cmd: 754862
-[DEBUG] camera_pos (tag_pos): [0.07691263 0.13456234 1.17094814]
-[DEBUG] offset_m: [200.55665836  19.74480207 100.73838048]
-[DEBUG] robot_pos: [200.633571    19.87936441 101.90932862]
-[DEBUG] obj_pos: [200.633571    19.87936441 101.90932862], target_pos: [ 0.0239 -0.2005  1.5526]
-[DEBUG] aprilag_visible: True
-[DEBUG] camera_pos (tag_pos): [0.07695566 0.13466638 1.17174375]
-[DEBUG] offset_m: [200.55665836  19.74480207 100.73838048]
-[DEBUG] robot_pos: [200.63361402  19.87946844 101.91012423]
-[Step  35] Reward:   0.00 | Episode Reward:   0.00 | Obj->Target: 225.2086m | Success: ❌
-[DEBUG] joint_0-5: 59085, 12240, -86922, -5725, -22146, -33550
-[DEBUG] gripper_cmd: 709939
-[DEBUG] camera_pos (tag_pos): [0.07693233 0.13458158 1.17114282]
-[DEBUG] offset_m: [200.55665836  19.74480207 100.73838048]
-[DEBUG] robot_pos: [200.63359069  19.87938365 101.9095233 ]
-[DEBUG] obj_pos: [200.63359069  19.87938365 101.9095233 ], target_pos: [ 0.0239 -0.2005  1.5526]
-[DEBUG] aprilag_visible: True
-[DEBUG] joint_0-5: 64109, 12915, -87302, -6579, -25935, -37655
-[DEBUG] gripper_cmd: 709939
-[DEBUG] camera_pos (tag_pos): [0.07698647 0.13465438 1.17182724]
-[DEBUG] offset_m: [200.55665836  19.74480207 100.73838048]
-[DEBUG] robot_pos: [200.63364483  19.87945645 101.91020773]
-[DEBUG] obj_pos: [200.63364483  19.87945645 101.91020773], target_pos: [ 0.0239 -0.2005  1.5526]
-[DEBUG] aprilag_visible: True
-[DEBUG] camera_pos (tag_pos): [0.07694714 0.13466324 1.17172895]
-[DEBUG] offset_m: [200.55665836  19.74480207 100.73838048]
-[DEBUG] robot_pos: [200.6336055   19.87946531 101.91010943]
-[Step  36] Reward:   0.00 | Episode Reward:   0.00 | Obj->Target: 225.2091m | Success: ❌
-[DEBUG] joint_0-5: 66510, 17341, -90371, -9816, -20846, -42559
-[DEBUG] gripper_cmd: 340082
-[DEBUG] camera_pos (tag_pos): [0.07692705 0.13460847 1.17138465]
-[DEBUG] offset_m: [200.55665836  19.74480207 100.73838048]
-[DEBUG] robot_pos: [200.63358542  19.87941054 101.90976513]
-[DEBUG] obj_pos: [200.63358542  19.87941054 101.90976513], target_pos: [ 0.0239 -0.2005  1.5526]
-[DEBUG] aprilag_visible: True
-[DEBUG] joint_0-5: 68910, 21767, -93440, -13052, -15757, -47463
-[DEBUG] gripper_cmd: 340082
-[DEBUG] camera_pos (tag_pos): [0.07693416 0.13464052 1.17162961]
-[DEBUG] offset_m: [200.55665836  19.74480207 100.73838048]
-[DEBUG] robot_pos: [200.63359253  19.87944259 101.91001009]
-[DEBUG] obj_pos: [200.63359253  19.87944259 101.91001009], target_pos: [ 0.0239 -0.2005  1.5526]
-[DEBUG] aprilag_visible: True
-[DEBUG] camera_pos (tag_pos): [0.07694128 0.13465654 1.17171072]
-[DEBUG] offset_m: [200.55665836  19.74480207 100.73838048]
-[DEBUG] robot_pos: [200.63359964  19.87945861 101.9100912 ]
-[Step  37] Reward:   0.00 | Episode Reward:   0.00 | Obj->Target: 225.2089m | Success: ❌
-[DEBUG] joint_0-5: 64624, 26261, -95885, -8404, -17653, -46064
-[DEBUG] gripper_cmd: 190322
-[DEBUG] camera_pos (tag_pos): [0.07695297 0.1346544  1.17164733]
-[DEBUG] offset_m: [200.55665836  19.74480207 100.73838048]
-[DEBUG] robot_pos: [200.63361134  19.87945647 101.91002781]
-[DEBUG] obj_pos: [200.63361134  19.87945647 101.91002781], target_pos: [ 0.0239 -0.2005  1.5526]
-[DEBUG] aprilag_visible: True
-[DEBUG] joint_0-5: 60338, 30756, -98330, -3755, -19548, -44665
-[DEBUG] gripper_cmd: 190322
-[DEBUG] camera_pos (tag_pos): [0.07703682 0.13480577 1.17286159]
-[DEBUG] offset_m: [200.55665836  19.74480207 100.73838048]
-[DEBUG] robot_pos: [200.63369518  19.87960783 101.91124207]
-[DEBUG] obj_pos: [200.63369518  19.87960783 101.91124207], target_pos: [ 0.0239 -0.2005  1.5526]
-[DEBUG] aprilag_visible: True
-[DEBUG] camera_pos (tag_pos): [0.07696877 0.13471038 1.17197673]
-[DEBUG] offset_m: [200.55665836  19.74480207 100.73838048]
-[DEBUG] robot_pos: [200.63362714  19.87951245 101.91035721]
-[Step  38] Reward:   0.00 | Episode Reward:   0.00 | Obj->Target: 225.2096m | Success: ❌
-[DEBUG] joint_0-5: 57691, 25404, -103685, 1185, -15185, -48852
-[DEBUG] gripper_cmd: 124158
-[DEBUG] camera_pos (tag_pos): [0.07702915 0.13474588 1.17253014]
-[DEBUG] offset_m: [200.55665836  19.74480207 100.73838048]
-[DEBUG] robot_pos: [200.63368752  19.87954795 101.91091062]
-[DEBUG] obj_pos: [200.63368752  19.87954795 101.91091062], target_pos: [ 0.0239 -0.2005  1.5526]
-[DEBUG] aprilag_visible: True
-[DEBUG] joint_0-5: 55045, 20053, -109040, 6125, -10822, -53039
-[DEBUG] gripper_cmd: 124158
-[DEBUG] camera_pos (tag_pos): [0.07700822 0.13473445 1.17244233]
-[DEBUG] offset_m: [200.55665836  19.74480207 100.73838048]
-[DEBUG] robot_pos: [200.63366658  19.87953652 101.91082281]
-[DEBUG] obj_pos: [200.63366658  19.87953652 101.91082281], target_pos: [ 0.0239 -0.2005  1.5526]
-[DEBUG] aprilag_visible: True
-[DEBUG] camera_pos (tag_pos): [0.07698744 0.13470612 1.17215903]
-[DEBUG] offset_m: [200.55665836  19.74480207 100.73838048]
-[DEBUG] robot_pos: [200.6336458   19.87950819 101.91053951]
-[Step  39] Reward:   0.00 | Episode Reward:   0.00 | Obj->Target: 225.2094m | Success: ❌
-[DEBUG] joint_0-5: 51024, 21208, -108999, 6936, -5631, -49560
-[DEBUG] gripper_cmd: 418544
-[DEBUG] camera_pos (tag_pos): [0.07705357 0.13481796 1.17304502]
-[DEBUG] offset_m: [200.55665836  19.74480207 100.73838048]
-[DEBUG] robot_pos: [200.63371193  19.87962003 101.9114255 ]
-[DEBUG] obj_pos: [200.63371193  19.87962003 101.9114255 ], target_pos: [ 0.0239 -0.2005  1.5526]
-[DEBUG] aprilag_visible: True
-[DEBUG] joint_0-5: 47002, 22363, -108959, 7746, -440, -46081
-[DEBUG] gripper_cmd: 418544
-[DEBUG] camera_pos (tag_pos): [0.07693244 0.13462065 1.17141884]
-[DEBUG] offset_m: [200.55665836  19.74480207 100.73838048]
-[DEBUG] robot_pos: [200.63359081  19.87942272 101.90979932]
-[DEBUG] obj_pos: [200.63359081  19.87942272 101.90979932], target_pos: [ 0.0239 -0.2005  1.5526]
-[DEBUG] aprilag_visible: True
-[DEBUG] camera_pos (tag_pos): [0.07698607 0.13469885 1.1720355 ]
-[DEBUG] offset_m: [200.55665836  19.74480207 100.73838048]
-[DEBUG] robot_pos: [200.63364443  19.87950091 101.91041598]
-[Step  40] Reward:   0.00 | Episode Reward:   0.00 | Obj->Target: 225.2088m | Success: ❌
-[DEBUG] joint_0-5: 52327, 24491, -111410, 4523, 2584, -49253
-[DEBUG] gripper_cmd: 983029
-[DEBUG] camera_pos (tag_pos): [0.07695546 0.13465538 1.17162882]
-[DEBUG] offset_m: [200.55665836  19.74480207 100.73838048]
-[DEBUG] robot_pos: [200.63361383  19.87945745 101.9100093 ]
-[DEBUG] obj_pos: [200.63361383  19.87945745 101.9100093 ], target_pos: [ 0.0239 -0.2005  1.5526]
-[DEBUG] aprilag_visible: True
-[DEBUG] joint_0-5: 57651, 26619, -113862, 1300, 5609, -52425
-[DEBUG] gripper_cmd: 983029
-[DEBUG] camera_pos (tag_pos): [0.07700565 0.1347543  1.172508  ]
-[DEBUG] offset_m: [200.55665836  19.74480207 100.73838048]
-[DEBUG] robot_pos: [200.63366401  19.87955637 101.91088848]
-[DEBUG] obj_pos: [200.63366401  19.87955637 101.91088848], target_pos: [ 0.0239 -0.2005  1.5526]
-[DEBUG] aprilag_visible: True
-[DEBUG] camera_pos (tag_pos): [0.0770572  0.13484926 1.17315669]
-[DEBUG] offset_m: [200.55665836  19.74480207 100.73838048]
-[DEBUG] robot_pos: [200.63371557  19.87965133 101.91153717]
-[Step  41] Reward:   0.00 | Episode Reward:   0.00 | Obj->Target: 225.2094m | Success: ❌
-[DEBUG] joint_0-5: 63341, 32233, -118280, 3678, 10611, -56046
-[DEBUG] gripper_cmd: 4224
-[DEBUG] camera_pos (tag_pos): [0.0769438  0.1346153  1.17137811]
-[DEBUG] offset_m: [200.55665836  19.74480207 100.73838048]
-[DEBUG] robot_pos: [200.63360216  19.87941737 101.90975859]
-[DEBUG] obj_pos: [200.63360216  19.87941737 101.90975859], target_pos: [ 0.0239 -0.2005  1.5526]
-[DEBUG] aprilag_visible: True
-[DEBUG] joint_0-5: 69031, 37847, -122699, 6055, 15613, -59667
-[DEBUG] gripper_cmd: 4224
-[DEBUG] camera_pos (tag_pos): [0.07695168 0.1346352  1.17152042]
-[DEBUG] offset_m: [200.55665836  19.74480207 100.73838048]
-[DEBUG] robot_pos: [200.63361004  19.87943727 101.9099009 ]
-[DEBUG] obj_pos: [200.63361004  19.87943727 101.9099009 ], target_pos: [ 0.0239 -0.2005  1.5526]
-[DEBUG] aprilag_visible: True
-[DEBUG] camera_pos (tag_pos): [0.07696148 0.13467453 1.17181261]
-[DEBUG] offset_m: [200.55665836  19.74480207 100.73838048]
-[DEBUG] robot_pos: [200.63361984  19.8794766  101.91019309]
-[Step  42] Reward:   0.00 | Episode Reward:   0.00 | Obj->Target: 225.2089m | Success: ❌
-[DEBUG] joint_0-5: 68354, 38617, -119943, 5924, 19947, -62886
-[DEBUG] gripper_cmd: 710767
-[DEBUG] camera_pos (tag_pos): [0.07701548 0.13475436 1.1723784 ]
-[DEBUG] offset_m: [200.55665836  19.74480207 100.73838048]
-[DEBUG] robot_pos: [200.63367384  19.87955643 101.91075888]
-[DEBUG] obj_pos: [200.63367384  19.87955643 101.91075888], target_pos: [ 0.0239 -0.2005  1.5526]
-[DEBUG] aprilag_visible: True
-[DEBUG] joint_0-5: 67677, 39388, -117186, 5794, 24280, -66106
-[DEBUG] gripper_cmd: 710767
-[DEBUG] camera_pos (tag_pos): [0.07701354 0.1347719  1.17258943]
-[DEBUG] offset_m: [200.55665836  19.74480207 100.73838048]
-[DEBUG] robot_pos: [200.6336719   19.87957397 101.91096991]
-[DEBUG] obj_pos: [200.6336719   19.87957397 101.91096991], target_pos: [ 0.0239 -0.2005  1.5526]
-[DEBUG] aprilag_visible: True
-[DEBUG] camera_pos (tag_pos): [0.07698652 0.13471971 1.1719608 ]
-[DEBUG] offset_m: [200.55665836  19.74480207 100.73838048]
-[DEBUG] robot_pos: [200.63364488  19.87952178 101.91034129]
-[Step  43] Reward:   0.00 | Episode Reward:   0.00 | Obj->Target: 225.2094m | Success: ❌
-[DEBUG] joint_0-5: 67127, 38623, -114028, 10352, 23657, -65073
-[DEBUG] gripper_cmd: 137063
-[DEBUG] camera_pos (tag_pos): [0.07702717 0.13477515 1.17260259]
-[DEBUG] offset_m: [200.55665836  19.74480207 100.73838048]
-[DEBUG] robot_pos: [200.63368553  19.87957722 101.91098307]
-[DEBUG] obj_pos: [200.63368553  19.87957722 101.91098307], target_pos: [ 0.0239 -0.2005  1.5526]
-[DEBUG] aprilag_visible: True
-[DEBUG] joint_0-5: 66576, 37859, -110869, 14911, 23033, -64040
-[DEBUG] gripper_cmd: 137063
-[DEBUG] camera_pos (tag_pos): [0.07702939 0.13482694 1.17292184]
-[DEBUG] offset_m: [200.55665836  19.74480207 100.73838048]
-[DEBUG] robot_pos: [200.63368775  19.879629   101.91130232]
-[DEBUG] obj_pos: [200.63368775  19.879629   101.91130232], target_pos: [ 0.0239 -0.2005  1.5526]
-[DEBUG] aprilag_visible: True
-[DEBUG] camera_pos (tag_pos): [0.07701038 0.13477378 1.17252337]
-[DEBUG] offset_m: [200.55665836  19.74480207 100.73838048]
-[DEBUG] robot_pos: [200.63366874  19.87957585 101.91090386]
-[Step  44] Reward:   0.00 | Episode Reward:   0.00 | Obj->Target: 225.2096m | Success: ❌
-[DEBUG] joint_0-5: 61810, 42784, -115232, 15940, 28672, -61218
-[DEBUG] gripper_cmd: 900898
-[DEBUG] camera_pos (tag_pos): [0.07698147 0.13465075 1.17170762]
-[DEBUG] offset_m: [200.55665836  19.74480207 100.73838048]
-[DEBUG] robot_pos: [200.63363983  19.87945282 101.9100881 ]
-[DEBUG] obj_pos: [200.63363983  19.87945282 101.9100881 ], target_pos: [ 0.0239 -0.2005  1.5526]
-[DEBUG] aprilag_visible: True
-[DEBUG] joint_0-5: 57043, 47708, -119596, 16970, 34310, -58396
-[DEBUG] gripper_cmd: 900898
-[DEBUG] camera_pos (tag_pos): [0.07697749 0.13466561 1.1717912 ]
-[DEBUG] offset_m: [200.55665836  19.74480207 100.73838048]
-[DEBUG] robot_pos: [200.63363585  19.87946768 101.91017168]
-[DEBUG] obj_pos: [200.63363585  19.87946768 101.91017168], target_pos: [ 0.0239 -0.2005  1.5526]
-[DEBUG] aprilag_visible: True
-[DEBUG] camera_pos (tag_pos): [0.07691933 0.13459118 1.17113625]
-[DEBUG] offset_m: [200.55665836  19.74480207 100.73838048]
-[DEBUG] robot_pos: [200.6335777   19.87939325 101.90951673]
-[Step  45] Reward:   0.00 | Episode Reward:   0.00 | Obj->Target: 225.2090m | Success: ❌
-[DEBUG] joint_0-5: 54365, 43422, -123944, 16573, 35806, -53198
-[DEBUG] gripper_cmd: 372048
-[DEBUG] camera_pos (tag_pos): [0.07697048 0.13468769 1.1719548 ]
-[DEBUG] offset_m: [200.55665836  19.74480207 100.73838048]
-[DEBUG] robot_pos: [200.63362884  19.87948976 101.91033528]
-[DEBUG] obj_pos: [200.63362884  19.87948976 101.91033528], target_pos: [ 0.0239 -0.2005  1.5526]
-[DEBUG] aprilag_visible: True
-[DEBUG] joint_0-5: 51687, 39136, -128292, 16176, 37302, -48000
-[DEBUG] gripper_cmd: 372048
-[DEBUG] camera_pos (tag_pos): [0.07698921 0.1346942  1.17203097]
-[DEBUG] offset_m: [200.55665836  19.74480207 100.73838048]
-[DEBUG] robot_pos: [200.63364757  19.87949627 101.91041145]
-[DEBUG] obj_pos: [200.63364757  19.87949627 101.91041145], target_pos: [ 0.0239 -0.2005  1.5526]
-[DEBUG] aprilag_visible: True
-[DEBUG] camera_pos (tag_pos): [0.07705328 0.13480292 1.17284558]
-[DEBUG] offset_m: [200.55665836  19.74480207 100.73838048]
-[DEBUG] robot_pos: [200.63371164  19.87960499 101.91122606]
-[Step  46] Reward:   0.00 | Episode Reward:   0.00 | Obj->Target: 225.2092m | Success: ❌
-[DEBUG] joint_0-5: 46595, 33838, -132069, 12170, 40023, -51156
-[DEBUG] gripper_cmd: 657781
-[DEBUG] camera_pos (tag_pos): [0.07700797 0.13472976 1.17238909]
-[DEBUG] offset_m: [200.55665836  19.74480207 100.73838048]
-[DEBUG] robot_pos: [200.63366633  19.87953182 101.91076957]
-[DEBUG] obj_pos: [200.63366633  19.87953182 101.91076957], target_pos: [ 0.0239 -0.2005  1.5526]
-[DEBUG] aprilag_visible: True
-[DEBUG] joint_0-5: 41503, 28541, -135846, 8164, 42745, -54312
-[DEBUG] gripper_cmd: 657781
-[DEBUG] camera_pos (tag_pos): [0.07699123 0.13472877 1.17231092]
-[DEBUG] offset_m: [200.55665836  19.74480207 100.73838048]
-[DEBUG] robot_pos: [200.63364959  19.87953083 101.9106914 ]
-[DEBUG] obj_pos: [200.63364959  19.87953083 101.9106914 ], target_pos: [ 0.0239 -0.2005  1.5526]
-[DEBUG] aprilag_visible: True
-[DEBUG] camera_pos (tag_pos): [0.07701246 0.1347476  1.17240867]
-[DEBUG] offset_m: [200.55665836  19.74480207 100.73838048]
-[DEBUG] robot_pos: [200.63367083  19.87954967 101.91078915]
-[Step  47] Reward:   0.00 | Episode Reward:   0.00 | Obj->Target: 225.2093m | Success: ❌
-[DEBUG] joint_0-5: 38337, 31831, -133279, 5692, 45670, -56057
-[DEBUG] gripper_cmd: 311059
-[DEBUG] camera_pos (tag_pos): [0.07698742 0.13468095 1.17194271]
-[DEBUG] offset_m: [200.55665836  19.74480207 100.73838048]
-[DEBUG] robot_pos: [200.63364579  19.87948302 101.91032319]
-[DEBUG] obj_pos: [200.63364579  19.87948302 101.91032319], target_pos: [ 0.0239 -0.2005  1.5526]
-[DEBUG] aprilag_visible: True
-[DEBUG] joint_0-5: 35171, 35122, -130712, 3220, 48594, -57802
-[DEBUG] gripper_cmd: 311059
-[DEBUG] camera_pos (tag_pos): [0.07696636 0.13469009 1.17189469]
-[DEBUG] offset_m: [200.55665836  19.74480207 100.73838048]
-[DEBUG] robot_pos: [200.63362472  19.87949216 101.91027517]
-[DEBUG] obj_pos: [200.63362472  19.87949216 101.91027517], target_pos: [ 0.0239 -0.2005  1.5526]
-[DEBUG] aprilag_visible: True
-[DEBUG] camera_pos (tag_pos): [0.07696277 0.13466509 1.17166821]
-[DEBUG] offset_m: [200.55665836  19.74480207 100.73838048]
-[DEBUG] robot_pos: [200.63362113  19.87946716 101.91004869]
-[Step  48] Reward:   0.00 | Episode Reward:   0.00 | Obj->Target: 225.2091m | Success: ❌
-[DEBUG] joint_0-5: 38585, 32368, -131761, 7076, 51186, -53706
-[DEBUG] gripper_cmd: 16093
-[DEBUG] camera_pos (tag_pos): [0.07698052 0.13467716 1.17180675]
-[DEBUG] offset_m: [200.55665836  19.74480207 100.73838048]
-[DEBUG] robot_pos: [200.63363888  19.87947923 101.91018723]
-[DEBUG] obj_pos: [200.63363888  19.87947923 101.91018723], target_pos: [ 0.0239 -0.2005  1.5526]
-[DEBUG] aprilag_visible: True
-[DEBUG] joint_0-5: 42000, 29615, -132811, 10933, 53777, -49609
-[DEBUG] gripper_cmd: 16093
-[DEBUG] camera_pos (tag_pos): [0.07694093 0.13462554 1.1714236 ]
-[DEBUG] offset_m: [200.55665836  19.74480207 100.73838048]
-[DEBUG] robot_pos: [200.63359929  19.87942761 101.90980408]
-[DEBUG] obj_pos: [200.63359929  19.87942761 101.90980408], target_pos: [ 0.0239 -0.2005  1.5526]
-[DEBUG] aprilag_visible: True
-[DEBUG] camera_pos (tag_pos): [0.07701206 0.13473362 1.172405  ]
-[DEBUG] offset_m: [200.55665836  19.74480207 100.73838048]
-[DEBUG] robot_pos: [200.63367042  19.87953569 101.91078548]
-[Step  49] Reward:   0.00 | Episode Reward:   0.00 | Obj->Target: 225.2088m | Success: ❌
-[DEBUG] joint_0-5: 36776, 25222, -135509, 10738, 54500, -49216
-[DEBUG] gripper_cmd: 178838
-[DEBUG] camera_pos (tag_pos): [0.07691385 0.13457528 1.17096446]
-[DEBUG] offset_m: [200.55665836  19.74480207 100.73838048]
-[DEBUG] robot_pos: [200.63357221  19.87937735 101.90934494]
-[DEBUG] obj_pos: [200.63357221  19.87937735 101.90934494], target_pos: [ 0.0239 -0.2005  1.5526]
-[DEBUG] aprilag_visible: True
-[DEBUG] joint_0-5: 31553, 20829, -138207, 10543, 55224, -48824
-[DEBUG] gripper_cmd: 178838
-[DEBUG] camera_pos (tag_pos): [0.07693628 0.13466051 1.17178375]
-[DEBUG] offset_m: [200.55665836  19.74480207 100.73838048]
-[DEBUG] robot_pos: [200.63359464  19.87946258 101.91016423]
-[DEBUG] obj_pos: [200.63359464  19.87946258 101.91016423], target_pos: [ 0.0239 -0.2005  1.5526]
-[DEBUG] aprilag_visible: True
-[DEBUG] camera_pos (tag_pos): [0.07699443 0.13476386 1.1724315 ]
-[DEBUG] offset_m: [200.55665836  19.74480207 100.73838048]
-[DEBUG] robot_pos: [200.63365279  19.87956592 101.91081198]
-[Step  50] Reward:   0.00 | Episode Reward:   0.00 | Obj->Target: 225.2090m | Success: ❌
-[DEBUG] joint_0-5: 31167, 25793, -133751, 10625, 56264, -51202
-[DEBUG] gripper_cmd: 68155
-[DEBUG] camera_pos (tag_pos): [0.07690038 0.13455575 1.17085424]
-[DEBUG] offset_m: [200.55665836  19.74480207 100.73838048]
-[DEBUG] robot_pos: [200.63355874  19.87935781 101.90923472]
-[DEBUG] obj_pos: [200.63355874  19.87935781 101.90923472], target_pos: [ 0.0239 -0.2005  1.5526]
-[DEBUG] aprilag_visible: True
-[DEBUG] joint_0-5: 30781, 30757, -129294, 10706, 57304, -53580
-[DEBUG] gripper_cmd: 68155
-[DEBUG] camera_pos (tag_pos): [0.07696737 0.13464378 1.17157371]
-[DEBUG] offset_m: [200.55665836  19.74480207 100.73838048]
-[DEBUG] robot_pos: [200.63362573  19.87944585 101.90995419]
-[DEBUG] obj_pos: [200.63362573  19.87944585 101.90995419], target_pos: [ 0.0239 -0.2005  1.5526]
-[DEBUG] aprilag_visible: True
-[DEBUG] camera_pos (tag_pos): [0.07687514 0.13452376 1.17058711]
-[DEBUG] offset_m: [200.55665836  19.74480207 100.73838048]
-[DEBUG] robot_pos: [200.6335335   19.87932582 101.90896759]
-[Step  51] Reward:   0.00 | Episode Reward:   0.00 | Obj->Target: 225.2089m | Success: ❌
-[DEBUG] joint_0-5: 34769, 28328, -131941, 7306, 55412, -55847
-[DEBUG] gripper_cmd: 629893
-[DEBUG] camera_pos (tag_pos): [0.07696516 0.13467103 1.17175327]
-[DEBUG] offset_m: [200.55665836  19.74480207 100.73838048]
-[DEBUG] robot_pos: [200.63362353  19.87947309 101.91013375]
-[DEBUG] obj_pos: [200.63362353  19.87947309 101.91013375], target_pos: [ 0.0239 -0.2005  1.5526]
-[DEBUG] aprilag_visible: True
-[DEBUG] joint_0-5: 38757, 25899, -134588, 3905, 53521, -58114
-[DEBUG] gripper_cmd: 629893
-[DEBUG] camera_pos (tag_pos): [0.07693963 0.13460888 1.1713976 ]
-[DEBUG] offset_m: [200.55665836  19.74480207 100.73838048]
-[DEBUG] robot_pos: [200.633598    19.87941095 101.90977808]
-[DEBUG] obj_pos: [200.633598    19.87941095 101.90977808], target_pos: [ 0.0239 -0.2005  1.5526]
-[DEBUG] aprilag_visible: True
-[DEBUG] camera_pos (tag_pos): [0.07699944 0.13471516 1.17209585]
-[DEBUG] offset_m: [200.55665836  19.74480207 100.73838048]
-[DEBUG] robot_pos: [200.6336578   19.87951723 101.91047633]
-[Step  52] Reward:   0.00 | Episode Reward:   0.00 | Obj->Target: 225.2088m | Success: ❌
-[DEBUG] joint_0-5: 39568, 25452, -136654, 4432, 51835, -62824
-[DEBUG] gripper_cmd: 322445
-[DEBUG] camera_pos (tag_pos): [0.07700481 0.13473573 1.17233845]
-[DEBUG] offset_m: [200.55665836  19.74480207 100.73838048]
-[DEBUG] robot_pos: [200.63366318  19.8795378  101.91071893]
-[DEBUG] obj_pos: [200.63366318  19.8795378  101.91071893], target_pos: [ 0.0239 -0.2005  1.5526]
-[DEBUG] aprilag_visible: True
-[DEBUG] joint_0-5: 40379, 25006, -138720, 4959, 50149, -67534
-[DEBUG] gripper_cmd: 322445
