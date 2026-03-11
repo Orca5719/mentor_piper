@@ -84,6 +84,7 @@ class Workspace:
         obj_pos = getattr(self.cfg, 'obj_pos', None)
         goal_pos = getattr(self.cfg, 'goal_pos', None)
         print_reward = getattr(self.cfg, 'print_reward', True)
+        debug_mode = getattr(self.cfg, 'debug_mode', False)
         use_apriltag = getattr(self.cfg, 'use_apriltag', False)
         tag_size = getattr(self.cfg, 'tag_size', 0.05)
         
@@ -97,6 +98,7 @@ class Workspace:
             obj_pos=obj_pos,
             goal_pos=goal_pos,
             print_reward=print_reward,
+            debug_mode=debug_mode,
             use_apriltag=use_apriltag,
             tag_size=tag_size
         )
@@ -110,6 +112,7 @@ class Workspace:
             obj_pos=obj_pos,
             goal_pos=goal_pos,
             print_reward=False,
+            debug_mode=False,
             use_apriltag=False,
             tag_size=tag_size
         )

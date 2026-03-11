@@ -97,12 +97,13 @@ class PiperEnv:
     def __init__(self, task_name, seed=None, action_repeat=1, 
                  size=(256, 256), use_sim=True, visualize=False,
                  obj_pos=None, goal_pos=None, print_reward=True,
-                 use_apriltag=False, tag_size=0.05):
+                 debug_mode=False, use_apriltag=False, tag_size=0.05):
         self.task_name = task_name
         self._size = size
         self._action_repeat = action_repeat
         self._visualize = visualize
         self._print_reward = print_reward
+        self._debug_mode = debug_mode
         
         np.random.seed(seed)
         
@@ -111,6 +112,7 @@ class PiperEnv:
                                 camera_height=size[1],
                                 obj_pos=obj_pos,
                                 goal_pos=goal_pos,
+                                debug_mode=debug_mode,
                                 use_apriltag=use_apriltag,
                                 tag_size=tag_size)
         
@@ -202,9 +204,10 @@ class PiperEnv:
         obj_pos = self.robot.get_obj_pos()
         target_pos = self.robot.get_goal_pos()
         
-        # 调试打印
-        print(f"[DEBUG] obj_pos: {obj_pos}, target_pos: {target_pos}")
-        print(f"[DEBUG] aprilag_visible: {self.robot.apriltag_visible}")
+        # 调试打印（仅在debug_mode时打印）
+        if self._debug_mode:
+            print(f"[DEBUG] obj_pos: {obj_pos}, target_pos: {target_pos}")
+            print(f"[DEBUG] aprilag_visible: {self.robot.apriltag_visible}")
         
         # AprilTag 丢失惩罚
         apriltag_penalty = 0.0
@@ -464,11 +467,12 @@ class PiperWrapper:
 
 def make(name, frame_stack, action_repeat, seed, use_sim=True, visualize=False,
          obj_pos=None, goal_pos=None, print_reward=True,
-         use_apriltag=False, tag_size=0.05):
+         debug_mode=False, use_apriltag=False, tag_size=0.05):
     env = PiperEnv(name, seed, action_repeat, (84, 84), 
                    use_sim=use_sim, visualize=visualize,
                    obj_pos=obj_pos, goal_pos=goal_pos,
                    print_reward=print_reward,
+                   debug_mode=debug_mode,
                    use_apriltag=use_apriltag, tag_size=tag_size)
     env = NormalizeAction(env)
     env = TimeLimit(env, 250)

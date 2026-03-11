@@ -1,11 +1,15 @@
-[DEBUG] camera_pos (tag_pos): [0.07695366 0.13458952 1.17128524]
+[DEBUG] camera_pos (tag_pos): [0.07709292 0.13483407 1.17309127]
 [DEBUG] offset_m: [0.20055666 0.0197448  0.10073838]
-[DEBUG] robot_pos: [0.27751032 0.15433432 1.27202362]
-[DEBUG] obj_pos: [0.27751032 0.15433432 1.27202362], target_pos: [ 0.0239 -0.2005  1.5526]
+[DEBUG] robot_pos: [0.27764957 0.15457887 1.27382965]
+[DEBUG] obj_pos: [0.27764957 0.15457887 1.27382965], target_pos: [ 0.0239 -0.2005  1.5526]
 [DEBUG] aprilag_visible: True
-[DEBUG] joint_0-5: 57392, 95432, 171454, -40881, 2264, -7026
-[DEBUG] gripper_cmd: 699767
-[DEBUG] Arm Status: time stamp:1773119718.5410235
+[DEBUG] camera_pos (tag_pos): [0.07699723 0.13463906 1.17167209]
+[DEBUG] offset_m: [0.20055666 0.0197448  0.10073838]
+[DEBUG] robot_pos: [0.27755389 0.15438386 1.27241047]
+[Step 149] Reward:   0.00 | Episode Reward:   0.00 | Obj->Target: 0.5179m | Success: ❌
+[DEBUG] joint_0-5: 26961, 136457, 0, -72463, -31794, -29790
+[DEBUG] gripper_cmd: 551338
+[DEBUG] Arm Status: time stamp:1773120008.639564
 Hz:200.0
 Control Mode: CAN_CTRL(0x1)
 Arm Status: NORMAL(0x0)
@@ -30,18 +34,50 @@ Error Status:
 
 
 
-[DEBUG] camera_pos (tag_pos): [0.07688515 0.134484   1.17025007]
+[DEBUG] camera_pos (tag_pos): [0.07710609 0.13483836 1.17331942]
 [DEBUG] offset_m: [0.20055666 0.0197448  0.10073838]
-[DEBUG] robot_pos: [0.27744181 0.1542288  1.27098845]
-[DEBUG] obj_pos: [0.27744181 0.1542288  1.27098845], target_pos: [ 0.0239 -0.2005  1.5526]
+[DEBUG] robot_pos: [0.27766275 0.15458316 1.2740578 ]
+[DEBUG] obj_pos: [0.27766275 0.15458316 1.2740578 ], target_pos: [ 0.0239 -0.2005  1.5526]
 [DEBUG] aprilag_visible: True
-[DEBUG] camera_pos (tag_pos): [0.07693654 0.13453684 1.17089603]
+[DEBUG] joint_0-5: 30979, 140693, 0, -76364, -37466, -32366
+[DEBUG] gripper_cmd: 551338
+[DEBUG] Arm Status: time stamp:1773120008.6795926
+Hz:210.0
+Control Mode: CAN_CTRL(0x1)
+Arm Status: NORMAL(0x0)
+Mode Feed: MOVE_J(0x1)
+Teach Status: STOP_RECORDING(0x2)
+Motion Status: REACH_TARGET_POS_SUCCESSFULLY(0x0)
+Trajectory Num: 0
+Error Code: 0
+Error Status: 
+ Joint 1 Angle Limit Status: False
+ Joint 2 Angle Limit Status: False
+ Joint 3 Angle Limit Status: False
+ Joint 4 Angle Limit Status: False
+ Joint 5 Angle Limit Status: False
+ Joint 6 Angle Limit Status: False
+ Joint 1 Communication Status: False
+ Joint 2 Communication Status: False
+ Joint 3 Communication Status: False
+ Joint 4 Communication Status: False
+ Joint 5 Communication Status: False
+ Joint 6 Communication Status: False
+
+
+
+[DEBUG] camera_pos (tag_pos): [0.07703521 0.13471361 1.17214241]
 [DEBUG] offset_m: [0.20055666 0.0197448  0.10073838]
-[DEBUG] robot_pos: [0.2774932  0.15428164 1.27163441]
-[Step 107] Reward:   0.00 | Episode Reward:   0.00 | Obj->Target: 0.5191m | Success: ❌
-[DEBUG] joint_0-5: 61881, 97480, 168953, -43352, -157, -11682
-[DEBUG] gripper_cmd: 113803
-[DEBUG] Arm Status: time stamp:1773119718.6310081
+[DEBUG] robot_pos: [0.27759187 0.15445842 1.27288079]
+[DEBUG] obj_pos: [0.27759187 0.15445842 1.27288079], target_pos: [ 0.0239 -0.2005  1.5526]
+[DEBUG] aprilag_visible: True
+[DEBUG] camera_pos (tag_pos): [0.07704775 0.13472923 1.17219457]
+[DEBUG] offset_m: [0.20055666 0.0197448  0.10073838]
+[DEBUG] robot_pos: [0.27760441 0.15447403 1.27293295]
+[Step 150] Reward:   0.00 | Episode Reward:   0.00 | Obj->Target: 0.5183m | Success: ❌
+[DEBUG] joint_0-5: 35504, 139491, 0, -74081, -39925, -32606
+[DEBUG] gripper_cmd: 924843
+[DEBUG] Arm Status: time stamp:1773120008.774598
 Hz:200.0
 Control Mode: CAN_CTRL(0x1)
 Arm Status: NORMAL(0x0)
@@ -66,14 +102,14 @@ Error Status:
 
 
 
-[DEBUG] camera_pos (tag_pos): [0.07689655 0.13451856 1.1708195 ]
+[DEBUG] camera_pos (tag_pos): [0.07698763 0.13460752 1.17132767]
 [DEBUG] offset_m: [0.20055666 0.0197448  0.10073838]
-[DEBUG] robot_pos: [0.27745321 0.15426337 1.27155788]
-[DEBUG] obj_pos: [0.27745321 0.15426337 1.27155788], target_pos: [ 0.0239 -0.2005  1.5526]
+[DEBUG] robot_pos: [0.27754429 0.15435232 1.27206605]
+[DEBUG] obj_pos: [0.27754429 0.15435232 1.27206605], target_pos: [ 0.0239 -0.2005  1.5526]
 [DEBUG] aprilag_visible: True
-[DEBUG] joint_0-5: 66370, 99528, 166452, -45822, -2578, -16338
-[DEBUG] gripper_cmd: 113803
-[DEBUG] Arm Status: time stamp:1773119718.6660273
+[DEBUG] joint_0-5: 40029, 138290, 0, -71799, -42383, -32846
+[DEBUG] gripper_cmd: 924843
+[DEBUG] Arm Status: time stamp:1773120008.8145673
 Hz:200.0
 Control Mode: CAN_CTRL(0x1)
 Arm Status: NORMAL(0x0)
@@ -95,79 +131,3 @@ Error Status:
  Joint 4 Communication Status: False
  Joint 5 Communication Status: False
  Joint 6 Communication Status: False
-
-
-
-[DEBUG] camera_pos (tag_pos): [0.07720243 0.13499804 1.17481974]
-[DEBUG] offset_m: [0.20055666 0.0197448  0.10073838]
-[DEBUG] robot_pos: [0.27775909 0.15474285 1.27555812]
-[DEBUG] obj_pos: [0.27775909 0.15474285 1.27555812], target_pos: [ 0.0239 -0.2005  1.5526]
-[DEBUG] aprilag_visible: True
-[DEBUG] camera_pos (tag_pos): [0.07702419 0.13471292 1.17237264]
-[DEBUG] offset_m: [0.20055666 0.0197448  0.10073838]
-[DEBUG] robot_pos: [0.27758085 0.15445772 1.27311102]
-[Step 108] Reward:   0.00 | Episode Reward:   0.00 | Obj->Target: 0.5171m | Success: ❌
-[DEBUG] joint_0-5: 61661, 96175, 168953, -49244, -708, -18279
-[DEBUG] gripper_cmd: 188689
-[DEBUG] Arm Status: time stamp:1773119718.7660406
-Hz:200.0
-Control Mode: CAN_CTRL(0x1)
-Arm Status: NORMAL(0x0)
-Mode Feed: MOVE_J(0x1)
-Teach Status: STOP_RECORDING(0x2)
-Motion Status: REACH_TARGET_POS_SUCCESSFULLY(0x0)
-Trajectory Num: 0
-Error Code: 0
-Error Status: 
- Joint 1 Angle Limit Status: False
- Joint 2 Angle Limit Status: False
- Joint 3 Angle Limit Status: False
- Joint 4 Angle Limit Status: False
- Joint 5 Angle Limit Status: False
- Joint 6 Angle Limit Status: False
- Joint 1 Communication Status: False
- Joint 2 Communication Status: False
- Joint 3 Communication Status: False
- Joint 4 Communication Status: False
- Joint 5 Communication Status: False
- Joint 6 Communication Status: False
-
-
-
-[DEBUG] camera_pos (tag_pos): [0.07694674 0.13458523 1.17113333]
-[DEBUG] offset_m: [0.20055666 0.0197448  0.10073838]
-[DEBUG] robot_pos: [0.27750339 0.15433004 1.27187171]
-[DEBUG] obj_pos: [0.27750339 0.15433004 1.27187171], target_pos: [ 0.0239 -0.2005  1.5526]
-[DEBUG] aprilag_visible: True
-[DEBUG] joint_0-5: 56951, 92821, 171453, -52666, 1162, -20221
-[DEBUG] gripper_cmd: 188689
-[DEBUG] Arm Status: time stamp:1773119718.801014
-Hz:200.0
-Control Mode: CAN_CTRL(0x1)
-Arm Status: NORMAL(0x0)
-Mode Feed: MOVE_J(0x1)
-Teach Status: STOP_RECORDING(0x2)
-Motion Status: REACH_TARGET_POS_SUCCESSFULLY(0x0)
-Trajectory Num: 0
-Error Code: 0
-Error Status: 
- Joint 1 Angle Limit Status: False
- Joint 2 Angle Limit Status: False
- Joint 3 Angle Limit Status: False
- Joint 4 Angle Limit Status: False
- Joint 5 Angle Limit Status: False
- Joint 6 Angle Limit Status: False
- Joint 1 Communication Status: False
- Joint 2 Communication Status: False
- Joint 3 Communication Status: False
- Joint 4 Communication Status: False
- Joint 5 Communication Status: False
- Joint 6 Communication Status: False
-
-
-
-[DEBUG] camera_pos (tag_pos): [0.07699032 0.13463577 1.17168337]
-[DEBUG] offset_m: [0.20055666 0.0197448  0.10073838]
-[DEBUG] robot_pos: [0.27754698 0.15438058 1.27242175]
-[DEBUG] obj_pos: [0.27754698 0.15438058 1.27242175], target_pos: [ 0.0239 -0.2005  1.5526]
-[DEBUG] aprilag_visible: True

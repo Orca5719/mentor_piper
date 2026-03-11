@@ -29,6 +29,7 @@ except ImportError:
 class PiperRobot:
     def __init__(self, use_sim=False, camera_width=256, camera_height=256,
                  obj_pos=None, goal_pos=None,
+                 debug_mode=False,
                  use_apriltag=False, tag_size=0.05,
                  camera_calibration_file='camera_calibration.npz',
                  hand_eye_calibration_file='hand_eye_calibration.npz'):
@@ -37,6 +38,7 @@ class PiperRobot:
         self.camera_height = camera_height
         self.use_apriltag = use_apriltag
         self.tag_size = tag_size
+        self.debug_mode = debug_mode
         
         self.piper = None
         self.factor = 57295.7795
@@ -57,6 +59,9 @@ class PiperRobot:
                     self.piper.ModeCtrl(0x01, 0x01, 50, 0x00)
                     self.piper.EnableArm(7, 0x02)
                     time.sleep(0.05)
+                # 清除所有关节错误并配置加速度
+                self.piper.JointConfig(7, 0x00, 0x00, 500, 0xAE)
+                time.sleep(0.1)
                 print("✓ 机械臂连接成功")
             except Exception as e:
                 print(f"警告：无法连接机械臂：{e}，将使用模拟模式")
@@ -263,19 +268,23 @@ class PiperRobot:
                 
                 gripper_cmd = round(abs(self.gripper_pos) * 1000 * 1000)
                 
-                print(f"[DEBUG] joint_0-5: {joint_0}, {joint_1}, {joint_2}, {joint_3}, {joint_4}, {joint_5}")
-                print(f"[DEBUG] gripper_cmd: {gripper_cmd}")
+                if self.debug_mode:
+                    print(f"[DEBUG] joint_0-5: {joint_0}, {joint_1}, {joint_2}, {joint_3}, {joint_4}, {joint_5}")
+                    print(f"[DEBUG] gripper_cmd: {gripper_cmd}")
                 
                 # 确保机械臂处于 CAN 命令控制模式并使能电机
                 self.piper.ModeCtrl(0x01, 0x01, spd, 0x00)
                 self.piper.EnableArm(7, 0x02)
+                # 清除错误并确保电机准备好
+                self.piper.JointConfig(7, 0x00, 0x00, 500, 0xAE)
                 time.sleep(0.01)  # 等待命令生效
                 self.piper.JointCtrl(joint_0, joint_1, joint_2, joint_3, joint_4, joint_5)
                 self.piper.GripperCtrl(gripper_cmd, 1000, 0x01, 0)
                 
-                # 获取机械臂状态用于调试
-                arm_status = self.piper.GetArmStatus()
-                print(f"[DEBUG] Arm Status: {arm_status}")
+                # 获取机械臂状态用于调试（仅在debug_mode下）
+                if self.debug_mode:
+                    arm_status = self.piper.GetArmStatus()
+                    print(f"[DEBUG] Arm Status: {arm_status}")
             except Exception as e:
                 print(f"设置关节位置错误：{e}")
                 import traceback
@@ -356,10 +365,11 @@ class PiperRobot:
             # robot_pos = tag_pos + offset
             robot_pos = camera_pos + offset_m
             
-            # 打印用于调试的原始值
-            print(f"[DEBUG] camera_pos (tag_pos): {camera_pos}")
-            print(f"[DEBUG] offset_m: {offset_m}")
-            print(f"[DEBUG] robot_pos: {robot_pos}")
+            # 打印用于调试的原始值（仅在debug_mode时打印）
+            if self.debug_mode:
+                print(f"[DEBUG] camera_pos (tag_pos): {camera_pos}")
+                print(f"[DEBUG] offset_m: {offset_m}")
+                print(f"[DEBUG] robot_pos: {robot_pos}")
             
             return robot_pos
         
