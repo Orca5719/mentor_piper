@@ -232,20 +232,33 @@ class PiperEnv:
             print(f"[DEBUG] obj_pos: {obj_pos}, target_pos: {target_pos}")
             print(f"[DEBUG] aprilag_visible: {self.robot.apriltag_visible}")
         
-        # AprilTag 丢失惩罚（已放宽）
+        # AprilTag 丢失惩罚（分级处理）
         apriltag_penalty = 0.0
         if not self.robot.apriltag_visible:
-            apriltag_penalty = -0.5
-        
-        # 位置限制惩罚
+            # 分级：短暂丢失 = 轻微惩罚，持续丢失 = 重惩罚
+            apriltag_penalty = -0.1  # 轻微警告
+
+        # 位置限制惩罚（分级：超出不同范围有不同惩罚）
         position_limit_penalty = 0.0
-        if hasattr(self.robot, 'position_limit_violated') and self.robot.position_limit_violated:
-            position_limit_penalty = -3.0
-        
-        # 机械臂卡住惩罚（已放宽）
+        if hasattr(self.robot, 'position_limit_violation_factor'):
+            # 使用 violation_factor（超出程度：0-1）
+            factor = getattr(self.robot, 'position_limit_violation_factor', 0.0)
+            if factor > 0:
+                # 基础惩罚 -0.3，最大可达 -1.5
+                position_limit_penalty = -0.3 - factor * 1.2
+        elif hasattr(self.robot, 'position_limit_violated') and self.robot.position_limit_violated:
+            position_limit_penalty = -0.5  # 降级兼容
+
+        # 机械臂卡住惩罚（使用卡住计数器）
         stuck_penalty = 0.0
-        if hasattr(self.robot, 'is_stuck') and self.robot.is_stuck():
-            stuck_penalty = -2.0
+        if hasattr(self.robot, 'stuck_counter'):
+            # 卡住时间越长，惩罚越大
+            stuck_count = getattr(self.robot, 'stuck_counter', 0)
+            if stuck_count > 0:
+                # 每帧 -0.05，最高 -1.5（30帧）
+                stuck_penalty = -min(stuck_count * 0.05, 1.5)
+        elif hasattr(self.robot, 'is_stuck') and self.robot.is_stuck():
+            stuck_penalty = -0.5  # 降级兼容
         
         scale = np.array([2., 2., 1.])
         target_to_obj = (obj_pos - target_pos) * scale
@@ -285,7 +298,7 @@ class PiperEnv:
         if obj_to_target < 0.05:
             reward = 10.0
         
-        # 添加所有惩罚
+        # 添加所有惩罚（分层机制，避免冲突同时保持约束力）
         reward += apriltag_penalty + position_limit_penalty + stuck_penalty
         
         # 添加手动奖励
