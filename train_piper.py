@@ -87,6 +87,8 @@ class Workspace:
         debug_mode = getattr(self.cfg, 'debug_mode', False)
         use_apriltag = getattr(self.cfg, 'use_apriltag', False)
         tag_size = getattr(self.cfg, 'tag_size', 0.05)
+        enable_spacemouse = getattr(self.cfg, 'enable_spacemouse', False)
+        spacemouse_scale = getattr(self.cfg, 'spacemouse_scale', 0.05)
         
         self.train_env = piper_env.make(
             self.cfg.task_name, 
@@ -100,21 +102,25 @@ class Workspace:
             print_reward=print_reward,
             debug_mode=debug_mode,
             use_apriltag=use_apriltag,
-            tag_size=tag_size
+            tag_size=tag_size,
+            enable_spacemouse=enable_spacemouse,
+            spacemouse_scale=spacemouse_scale
         )
+        # 修复：评估环境与训练环境使用相同配置
         self.eval_env = piper_env.make(
             self.cfg.task_name, 
             self.cfg.frame_stack,
             self.cfg.action_repeat, 
             self.cfg.seed,
-            use_sim=True,
-            visualize=False,
+            use_sim=use_sim,           # ✅ 与训练环境一致
+            visualize=visualize,        # ✅ 使用相同可视化设置
             obj_pos=obj_pos,
             goal_pos=goal_pos,
-            print_reward=False,
-            debug_mode=False,
-            use_apriltag=False,
-            tag_size=tag_size
+            print_reward=print_reward,   # ✅ 使用相同打印设置
+            debug_mode=debug_mode,      # ✅ 使用相同调试模式
+            use_apriltag=use_apriltag,  # ✅ 使用相同 AprilTag 设置
+            tag_size=tag_size,
+            enable_spacemouse=False      # 评估时禁用 SpaceMouse 干预
         )
         
         data_specs = (self.train_env.observation_spec(),

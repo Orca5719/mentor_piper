@@ -41,7 +41,7 @@ def make_agent(obs_spec, action_spec, cfg):
 
 def load_bc_checkpoints(agent, bc_checkpoint_path, device):
     """
-    加载 BC 预训练的 actor 网络
+    加载 BC 预训练的 actor 和 encoder 网络
     
     Args:
         agent: RL agent
@@ -55,31 +55,74 @@ def load_bc_checkpoints(agent, bc_checkpoint_path, device):
     print(f"加载 BC 预训练模型: {bc_checkpoint_path}")
     checkpoint = torch.load(bc_checkpoint_path, map_location=device)
     
-    # 将 BC 模型权重加载到 agent 的 actor 网络
-    # 注意：需要根据实际的 agent 结构调整
-    if hasattr(agent, 'actor'):
+    success = False
+    
+    # 方式 1：尝试加载兼容的 BC checkpoint (encoder + actor 分离)
+    if 'encoder_state_dict' in checkpoint and 'actor_state_dict' in checkpoint:
+        print("✓ 检测到 MENTOR 兼容的 BC checkpoint")
+        
+        # 加载 Encoder
+        if hasattr(agent, 'encoder'):
+            encoder_dict = agent.encoder.state_dict()
+            bc_encoder_dict = checkpoint['encoder_state_dict']
+            
+            matched_encoder = {}
+            for k, v in bc_encoder_dict.items():
+                if k in encoder_dict and v.shape == encoder_dict[k].shape:
+                    matched_encoder[k] = v
+                    print(f"  ✓ 加载 Encoder 层: {k} {v.shape}")
+            
+            if len(matched_encoder) > 0:
+                agent.encoder.load_state_dict(matched_encoder, strict=False)
+                print(f"✓ 成功加载 {len(matched_encoder)} 个 Encoder 层")
+                success = True
+            else:
+                print("⚠️ 没有找到匹配的 Encoder 层")
+        
+        # 加载 Actor
+        if hasattr(agent, 'actor'):
+            actor_dict = agent.actor.state_dict()
+            bc_actor_dict = checkpoint['actor_state_dict']
+            
+            matched_actor = {}
+            for k, v in bc_actor_dict.items():
+                if k in actor_dict and v.shape == actor_dict[k].shape:
+                    matched_actor[k] = v
+                    print(f"  ✓ 加载 Actor 层: {k} {v.shape}")
+            
+            if len(matched_actor) > 0:
+                agent.actor.load_state_dict(matched_actor, strict=False)
+                print(f"✓ 成功加载 {len(matched_actor)} 个 Actor 层")
+                success = True
+            else:
+                print("⚠️ 没有找到匹配的 Actor 层")
+    
+    # 方式 2：尝试加载旧的 BC checkpoint (单模型)
+    elif 'model_state_dict' in checkpoint:
+        print("⚠️ 检测到旧版 BC checkpoint，可能不完全兼容")
         bc_state_dict = checkpoint['model_state_dict']
         
-        # 尝试匹配层
-        agent_dict = agent.actor.state_dict()
-        
-        # 创建新的 state_dict，只加载匹配的层
-        matched_state_dict = {}
-        for k, v in bc_state_dict.items():
-            if k in agent_dict and v.shape == agent_dict[k].shape:
-                matched_state_dict[k] = v
-                print(f"  ✓ 加载层: {k} {v.shape}")
-        
-        if len(matched_state_dict) > 0:
-            agent.actor.load_state_dict(matched_state_dict, strict=False)
-            print(f"✓ 成功加载 {len(matched_state_dict)} 个层的权重")
-            return True
+        if hasattr(agent, 'actor'):
+            agent_dict = agent.actor.state_dict()
+            
+            matched_state_dict = {}
+            for k, v in bc_state_dict.items():
+                if k in agent_dict and v.shape == agent_dict[k].shape:
+                    matched_state_dict[k] = v
+                    print(f"  ✓ 加载层: {k} {v.shape}")
+            
+            if len(matched_state_dict) > 0:
+                agent.actor.load_state_dict(matched_state_dict, strict=False)
+                print(f"✓ 成功加载 {len(matched_state_dict)} 个层的权重")
+                success = True
+            else:
+                print("✗ 没有找到匹配的层")
         else:
-            print("✗ 没有找到匹配的层")
-            return False
+            print("✗ Agent 没有 actor 属性")
     else:
-        print("✗ Agent 没有 actor 属性")
-        return False
+        print("✗ 未知的 checkpoint 格式")
+    
+    return success
 
 
 def load_demo_data(demo_dir="./demo_data"):
@@ -189,6 +232,8 @@ class Workspace:
         debug_mode = getattr(self.cfg, 'debug_mode', False)
         use_apriltag = getattr(self.cfg, 'use_apriltag', False)
         tag_size = getattr(self.cfg, 'tag_size', 0.05)
+        enable_spacemouse = getattr(self.cfg, 'enable_spacemouse', False)
+        spacemouse_scale = getattr(self.cfg, 'spacemouse_scale', 0.05)
         
         self.train_env = piper_env.make(
             self.cfg.task_name, 
@@ -202,21 +247,25 @@ class Workspace:
             print_reward=print_reward,
             debug_mode=debug_mode,
             use_apriltag=use_apriltag,
-            tag_size=tag_size
+            tag_size=tag_size,
+            enable_spacemouse=enable_spacemouse,
+            spacemouse_scale=spacemouse_scale
         )
+        # 修复：评估环境与训练环境使用相同配置
         self.eval_env = piper_env.make(
             self.cfg.task_name, 
             self.cfg.frame_stack,
             self.cfg.action_repeat, 
             self.cfg.seed,
-            use_sim=True,
-            visualize=False,
+            use_sim=use_sim,           # ✅ 与训练环境一致
+            visualize=visualize,        # ✅ 使用相同可视化设置
             obj_pos=obj_pos,
             goal_pos=goal_pos,
-            print_reward=False,
-            debug_mode=False,
-            use_apriltag=False,
-            tag_size=tag_size
+            print_reward=print_reward,   # ✅ 使用相同打印设置
+            debug_mode=debug_mode,      # ✅ 使用相同调试模式
+            use_apriltag=use_apriltag,  # ✅ 使用相同 AprilTag 设置
+            tag_size=tag_size,
+            enable_spacemouse=False      # 评估时禁用 SpaceMouse 干预
         )
         
         data_specs = (self.train_env.observation_spec(),
