@@ -106,6 +106,26 @@ class PiperEnv:
         self._print_reward = print_reward
         self._debug_mode = debug_mode
         
+        # 检查是否有图形界面（用于cv2.imshow）
+        self._has_display = False
+        if visualize:
+            import os
+            display = os.environ.get('DISPLAY')
+            if display:
+                try:
+                    # 尝试创建窗口测试显示
+                    import cv2
+                    cv2.namedWindow('test', cv2.WINDOW_NORMAL)
+                    cv2.destroyAllWindows()
+                    self._has_display = True
+                    print("✓ 检测到图形界面，启用可视化")
+                except:
+                    print("⚠️ 未检测到图形界面，禁用可视化")
+                    self._visualize = False
+            else:
+                print("⚠️ DISPLAY环境变量未设置，禁用可视化")
+                self._visualize = False
+        
         np.random.seed(seed)
         
         self.robot = PiperRobot(use_sim=use_sim, 
@@ -131,8 +151,15 @@ class PiperEnv:
         self.step_count = 0
         self.obj_init_pos = np.array([0.0, 0.6, 0.0])
         self._episode_reward = 0.0
-        self._window_name = "Piper Training Camera"
         self._manual_reward = 0.0  # 手动奖励
+        
+        # 只在有图形界面时初始化窗口
+        if self._has_display:
+            import cv2
+            self._window_name = "Piper Training Camera"
+            cv2.namedWindow(self._window_name, cv2.WINDOW_NORMAL)
+            cv2.resizeWindow(self._window_name, 640, 480)
+            print("✓ 可视化窗口已创建")
         
         # 初始化 SpaceMouse 控制器（可选）
         self._spacemouse_enabled = enable_spacemouse
@@ -149,7 +176,7 @@ class PiperEnv:
                 self._spacemouse_enabled = False
     
     def _visualize_frame(self, obs, reward, success, step_count, obj_to_target=None, episode_reward=None):
-        if not self._visualize:
+        if not self._visualize or not self._has_display:
             return
         
         try:
@@ -195,16 +222,18 @@ class PiperEnv:
             if key == ord('q'):
                 print("\n用户关闭可视化窗口，继续训练...")
                 self._visualize = False
-                try:
-                    cv2.destroyWindow(self._window_name)
-                except:
-                    pass
+                cv2.destroyAllWindows()
             elif key == ord(' '):  # 空格键
-                self._manual_reward += 10.0  # 按空格键增加 5 点奖励
+                self._manual_reward += 10.0  # 按空格键增加 10 点奖励
                 print(f"\n[手动奖励] +10.0 (当前累积：{self._manual_reward:.1f})")
-                    
         except Exception as e:
-            print(f"可视化错误: {e}")
+            if self._debug_mode:
+                print(f"可视化错误: {e}")
+            self._visualize = False
+            try:
+                cv2.destroyWindow(self._window_name)
+            except:
+                pass
             self._visualize = False
     
     @property
@@ -550,13 +579,16 @@ class PiperWrapper:
 
 def make(name, frame_stack, action_repeat, seed, use_sim=True, visualize=False,
          obj_pos=None, goal_pos=None, print_reward=True,
-         debug_mode=False, use_apriltag=False, tag_size=0.05):
-    env = PiperEnv(name, seed, action_repeat, (84, 84), 
+         debug_mode=False, use_apriltag=False, tag_size=0.05,
+         enable_spacemouse=False, spacemouse_scale=0.05):
+    env = PiperEnv(name, seed, action_repeat, (84, 84),
                    use_sim=use_sim, visualize=visualize,
                    obj_pos=obj_pos, goal_pos=goal_pos,
                    print_reward=print_reward,
                    debug_mode=debug_mode,
-                   use_apriltag=use_apriltag, tag_size=tag_size)
+                   use_apriltag=use_apriltag, tag_size=tag_size,
+                   enable_spacemouse=enable_spacemouse,
+                   spacemouse_scale=spacemouse_scale)
     env = NormalizeAction(env)
     env = TimeLimit(env, 250)
     env = PiperWrapper(env, frame_stack)
