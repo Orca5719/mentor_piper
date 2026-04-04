@@ -35,7 +35,7 @@ num_train_frames: 2100000
 
 # piper specific
 use_sim: false  # 设置为 false 使用真实机械臂，true 使用模拟
-visualize: true  # 设置为 true 在训练时显示摄像头画面
+visualize: false  # 设置为 true 在训练时显示摄像头画面（在远程服务器上应设为 false）
 print_reward: true  # 设置为 true 在训练时打印 reward 信息
 debug_mode: false  # 设置为 true 打印详细调试信息，false 只打印训练相关信息
 
