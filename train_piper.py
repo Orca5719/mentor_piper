@@ -3,10 +3,15 @@ import warnings
 warnings.filterwarnings('ignore', category=DeprecationWarning)
 
 import os
+import sys
 
 os.environ['MKL_SERVICE_FORCE_INTEL'] = '1'
 
 from pathlib import Path
+
+# 将项目根目录添加到 Python 路径
+PROJECT_ROOT = Path(__file__).resolve().parent
+sys.path.insert(0, str(PROJECT_ROOT))
 
 import hydra
 import numpy as np
@@ -106,21 +111,22 @@ class Workspace:
             enable_spacemouse=enable_spacemouse,
             spacemouse_scale=spacemouse_scale
         )
-        # 修复：评估环境与训练环境使用相同配置
+        # 评估环境：使用模拟模式以避免相机冲突
+        # 注意：评估时无法使用真实相机和机械臂，主要评估策略质量
         self.eval_env = piper_env.make(
             self.cfg.task_name, 
             self.cfg.frame_stack,
             self.cfg.action_repeat, 
             self.cfg.seed,
-            use_sim=use_sim,           # ✅ 与训练环境一致
-            visualize=visualize,        # ✅ 使用相同可视化设置
+            use_sim=True,              # ✅ 使用模拟模式避免相机冲突
+            visualize=False,            # ✅ 评估不需要可视化
             obj_pos=obj_pos,
             goal_pos=goal_pos,
-            print_reward=print_reward,   # ✅ 使用相同打印设置
-            debug_mode=debug_mode,      # ✅ 使用相同调试模式
-            use_apriltag=use_apriltag,  # ✅ 使用相同 AprilTag 设置
+            print_reward=False,         # ✅ 减少日志输出
+            debug_mode=False,
+            use_apriltag=False,        # ✅ 模拟环境不需要真实AprilTag
             tag_size=tag_size,
-            enable_spacemouse=False      # 评估时禁用 SpaceMouse 干预
+            enable_spacemouse=False
         )
         
         data_specs = (self.train_env.observation_spec(),
@@ -303,6 +309,10 @@ class Workspace:
 
 @hydra.main(config_path='piper/cfgs', config_name='config')
 def main(cfgs):
+    # Hydra 会切换到 outputs/ 目录，需要确保能找到项目模块
+    if str(PROJECT_ROOT) not in sys.path:
+        sys.path.insert(0, str(PROJECT_ROOT))
+
     from train_piper import Workspace as W
     root_dir = Path.cwd()
     workspace = W(cfgs)

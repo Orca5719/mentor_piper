@@ -265,7 +265,8 @@ class Workspace:
             debug_mode=debug_mode,      # ✅ 使用相同调试模式
             use_apriltag=use_apriltag,  # ✅ 使用相同 AprilTag 设置
             tag_size=tag_size,
-            enable_spacemouse=False      # 评估时禁用 SpaceMouse 干预
+            enable_spacemouse=False,    # 评估时禁用 SpaceMouse 干预
+            spacemouse_scale=spacemouse_scale
         )
         
         data_specs = (self.train_env.observation_spec(),

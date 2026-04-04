@@ -1,0 +1,38 @@
+# PyTorch
+torch>=1.10.0
+torchvision>=0.11.0
+
+# 数值计算
+numpy>=1.20.0
+scipy>=1.7.0
+
+# OpenCV
+opencv-python>=4.5.0
+
+# 相机相关
+pyrealsense2>=2.50.0
+
+# 点云处理
+open3d>=0.13.0
+
+# AprilTag 检测
+pupil-apriltags>=1.0.0
+
+# 强化学习相关
+gym>=0.19.0
+dm-env>=1.6
+tensorboard>=2.6.0
+
+# Hydra 配置管理
+hydra-core>=1.1.0
+omegaconf>=2.1.0
+
+# WandB (可选)
+wandb>=0.12.0
+
+# 其他
+tqdm>=4.62.0
+pyyaml>=5.4.0
+
+# 注意：piper_sdk 需要从官方获取，不在 PyPI
+# 确保已正确安装 piper_sdk
