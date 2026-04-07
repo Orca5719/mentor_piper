@@ -2,6 +2,13 @@ import numpy as np
 import time
 import cv2
 import os
+import logging
+import threading
+
+# 禁用 Piper SDK 的日志输出，避免 ERROR 日志阻塞
+logging.getLogger('piper_sdk').setLevel(logging.CRITICAL)
+logging.getLogger('PIPER').setLevel(logging.CRITICAL)
+
 
 # ============================================
 # 📌 Piper 机械臂配置区域 - 在这里修改初始位置和限制
@@ -104,7 +111,7 @@ class PiperRobot:
                 else:
                     raise RuntimeError("机械臂使能失败，请检查CAN连接和电源")
                 
-                # 设置夹爪初始状态
+                # 设置夹爪初始状态 (完全关闭)
                 try:
                     self.piper.GripperCtrl(0, 1000, 0x01, 0)
                     time.sleep(0.05)
@@ -192,10 +199,6 @@ class PiperRobot:
         self.last_valid_joint_pos = None  # 最后一个有效的关节位置（用于限制变化量）
         self.position_limit_violated = False  # 位置限制是否被触发
         self.stuck_threshold = 15  # 连续多少步认为卡住（已放宽）
-        
-        # CAN 通信错误计数和恢复
-        self._can_error_count = 0
-        self._recover_count = 0
         
         # AprilTag 初始化
         self.apriltag_detector = None
@@ -345,15 +348,14 @@ class PiperRobot:
             try:
                 spd = speed if speed is not None else 20  # 超低速模式，约 1-2 cm/s 的末端速度
                 
-                # 关节角度限制（单位：弧度）- 已在 SDK 初始化时设置
-                # SDK 会自动限制关节角度，这里只需要检查变化量
+                # 关节角度限制（单位：弧度）- 扩大范围以避免卡住
                 joint_limits = [
-                    (-2.6179, 2.6179),  # Joint 1: [-150°, 150°] (SDK 限制)
-                    (-0.1745, 3.14),    # Joint 2: [-10° 到 180°] (原 0° 到 180°，向下扩展 10°)
-                    (-3.1416, 0.1745),  # Joint 3: [-180° 到 10°] (原 -170° 到 0°，向下扩展 10°)
-                    (-1.745, 1.745),    # Joint 4: [-100° 到 100°] (保持 SDK 限制)
-                    (-1.22, 1.22),      # Joint 5: [-70° 到 70°] (保持 SDK 限制)
-                    (-2.09439, 2.09439) # Joint 6: [-120° 到 120°] (保持 SDK 限制)
+                    (-2.6179, 2.6179),  # Joint 1: [-150°, 150°]
+                    (-1.57, 3.14),      # Joint 2: [-90° 到 180°] (扩大向下范围)
+                    (-3.1416, 0.1745),  # Joint 3: [-180° 到 10°]
+                    (-1.745, 1.745),    # Joint 4: [-100° 到 100°]
+                    (-1.22, 1.22),      # Joint 5: [-70° 到 70°]
+                    (-2.09439, 2.09439) # Joint 6: [-120° 到 120°]
                 ]
                 
                 # 限制关节角度在安全范围内（双重保护）
@@ -386,7 +388,8 @@ class PiperRobot:
                 joint_4 = round(joint_pos_clipped[4] * self.factor)
                 joint_5 = round(joint_pos_clipped[5] * self.factor)
                 
-                gripper_cmd = round(abs(self.gripper_pos) * 1000 * 1000)
+                # gripper_angle 单位是 0.001mm，典型夹爪行程约 50mm，所以用 0-50000
+                gripper_cmd = round(abs(self.gripper_pos) * 50000)
                 
                 if self.debug_mode:
                     print(f"[DEBUG] joint_0-5: {joint_0}, {joint_1}, {joint_2}, {joint_3}, {joint_4}, {joint_5}")
@@ -411,45 +414,19 @@ class PiperRobot:
                     joint_4 = round(self.safe_joint_pos[4] * self.factor)
                     joint_5 = round(self.safe_joint_pos[5] * self.factor)
                 
-                # 确保机械臂处于 CAN 命令控制模式并使能电机（带异常处理和自动恢复）
-                can_error_count = getattr(self, '_can_error_count', 0)
-                try:
-                    self.piper.ModeCtrl(0x01, 0x01, spd, 0x00)
-                    time.sleep(0.005)
-                except Exception as e:
-                    if self.debug_mode:
-                        print(f"[CAN 警告] ModeCtrl 失败: {e}")
-                    if can_error_count > 5:
-                        self._recover_arm()
-                        can_error_count = 0
-                
-                try:
-                    self.piper.EnableArm(7, 0x02)
-                    time.sleep(0.005)
-                except Exception as e:
-                    if self.debug_mode:
-                        print(f"[CAN 警告] EnableArm 失败: {e}")
-                    can_error_count += 1
-                    if can_error_count > 5:
-                        self._recover_arm()
-                        can_error_count = 0
-                
-                self._can_error_count = can_error_count
-                
+                # 确保机械臂处于 CAN 命令控制模式并使能电机
+                self.piper.ModeCtrl(0x01, 0x01, spd, 0x00)
+                self.piper.EnableArm(7, 0x02)
                 # 清除错误并确保电机准备好
-                try:
-                    self.piper.JointConfig(7, 0x00, 0x00, 500, 0xAE)
-                    time.sleep(0.005)
-                except:
-                    pass  # 忽略配置命令失败
+                self.piper.JointConfig(7, 0x00, 0x00, 500, 0xAE)
+                time.sleep(0.01)  # 等待命令生效
                 
                 # 发送关节指令（带重试机制）
-                max_retries = 3
+                max_retries = 2
                 for attempt in range(max_retries):
                     try:
                         self.piper.JointCtrl(joint_0, joint_1, joint_2, joint_3, joint_4, joint_5)
                         self.piper.GripperCtrl(gripper_cmd, 1000, 0x01, 0)
-                        self._can_error_count = 0  # 成功则重置计数器
                         break
                     except Exception as e:
                         if attempt < max_retries - 1:
@@ -458,8 +435,7 @@ class PiperRobot:
                             time.sleep(0.02)
                         else:
                             print(f"[CAN 错误] 关节指令发送失败：{e}")
-                            # 不再抛出异常，而是尝试恢复
-                            self._recover_arm()
+                            raise
                 
                 # 等待移动完成
                 time.sleep(0.1)
@@ -483,51 +459,6 @@ class PiperRobot:
         self.current_joint_pos = joint_pos.copy()
         if self.use_sim:
             self._update_end_effector_pos_sim()
-    
-    def _recover_arm(self):
-        """自动恢复机械臂 CAN 通信错误"""
-        print("[恢复] 尝试恢复机械臂 CAN 通信...")
-        recover_count = getattr(self, '_recover_count', 0)
-        
-        for attempt in range(3):
-            try:
-                # 1. 禁用机械臂
-                try:
-                    self.piper.DisableArm()
-                except:
-                    pass
-                time.sleep(0.1)
-                
-                # 2. 重新使能
-                self.piper.EnablePiper()
-                time.sleep(0.05)
-                self.piper.ModeCtrl(0x01, 0x01, 30, 0x00)
-                time.sleep(0.02)
-                self.piper.EnableArm(7, 0x02)
-                time.sleep(0.05)
-                
-                # 3. 清除错误
-                try:
-                    self.piper.JointConfig(7, 0x00, 0x00, 500, 0xAE)
-                except:
-                    pass
-                
-                print("[恢复] 机械臂恢复成功！")
-                self._recover_count = 0
-                return True
-                
-            except Exception as e:
-                print(f"[恢复] 第{attempt+1}次恢复尝试失败: {e}")
-                time.sleep(0.2)
-        
-        self._recover_count = recover_count + 1
-        print(f"[警告] 机械臂恢复失败，已尝试 {self._recover_count} 次")
-        
-        # 如果恢复次数太多，返回初始位置
-        if self._recover_count > 10:
-            print("[紧急] 多次恢复失败，尝试回到安全位置...")
-            self._recover_count = 0
-        return False
             
     def get_end_effector_pos(self):
         if not self.use_sim and self.piper is not None:
@@ -541,6 +472,65 @@ class PiperRobot:
             except Exception as e:
                 print(f"获取末端位置错误：{e}")
         return self.current_end_effector_pos.copy()
+    
+    def move_end_effector_delta(self, dx=0, dy=0, dz=0, gripper=0, scale=0.1):
+        """
+        简化的笛卡尔方向控制
+        
+        控制映射：
+        - dx (左右): 关节0 (基座旋转)
+        - dy (前后): 关节1 (肩部俯仰)  
+        - dz (上下): 关节3 (腕部俯仰)
+        - W/S 通过空格独立控制夹爪
+        
+        Args:
+            dx: X轴增量（左右） -> 关节0
+            dy: Y轴增量（前后） -> 关节1
+            dz: Z轴增量（上下） -> 关节3
+            gripper: 夹爪位置 (-1 到 1)
+            scale: 移动缩放因子
+        """
+        # 获取当前关节位置
+        current_joints = self.current_joint_pos.copy()
+        
+        # 简化的关节映射 - 每个轴对应一个主要关节
+        joint_delta = np.zeros(6)
+        joint_delta[0] = dx * scale * 1.5   # 关节0: 左右旋转 (X轴)
+        joint_delta[1] = dy * scale         # 关节1: 前后俯仰 (Y轴)
+        joint_delta[2] = 0                  # 关节2: 保持不变
+        joint_delta[3] = dz * scale         # 关节3: 上下俯仰 (Z轴)
+        joint_delta[4] = 0                  # 关节4: 保持不变
+        joint_delta[5] = 0                  # 关节5: 保持不变
+        
+        # 计算新关节位置
+        new_joints = current_joints + joint_delta
+        
+        # Piper 关节安全限幅（弧度）- 扩大范围以避免卡住
+        joint_limits = np.array([
+            [-2.0, 2.0],      # 关节0: ±115°
+            [-1.5, 3.0],      # 关节1: -86° ~ +172°
+            [-3.0, 1.5],      # 关节2: ±86°
+            [-1.5, 1.5],      # 关节3: ±86°
+            [-1.5, 1.5],      # 关节4: ±86°
+            [-5.0, 5.0]       # 关节5: 无限制
+        ])
+        
+        new_joints = np.clip(new_joints, joint_limits[:, 0], joint_limits[:, 1])
+        
+        # 设置夹爪
+        gripper_pos = np.clip((gripper + 1.0) / 2.0, 0.0, 1.0)
+        
+        # 记录夹爪位置用于调试
+        self.gripper_pos = gripper_pos
+        
+        # 执行移动
+        self.set_joint_pos(new_joints, gripper_pos)
+        
+        # 模拟模式下打印夹爪状态
+        if self.use_sim and self.debug_mode:
+            print(f"[DEBUG] 夹爪: {gripper_pos:.2f} ({'打开' if gripper_pos > 0.5 else '关闭'})")
+        
+        return self.get_end_effector_pos()
             
     def get_obj_pos(self):
         if self.use_sim:
@@ -667,9 +657,6 @@ class PiperRobot:
         self.safe_joint_pos = np.array(INITIAL_JOINT_POS).copy()
         self.last_valid_joint_pos = np.array(INITIAL_JOINT_POS).copy()  # 初始化最后有效位置
         self.position_limit_violated = False
-        # 重置 CAN 错误计数器
-        self._can_error_count = 0
-        self._recover_count = 0
         
         if not hasattr(self, '_initial_obj_pos'):
             self._initial_obj_pos = self.obj_pos.copy()
@@ -716,7 +703,10 @@ class PiperRobot:
         new_joint_pos = self.current_joint_pos + joint_delta
         # 把 action[6] 从 [-1,1] 映射到 [0,1]
         new_gripper_pos = (action[6] + 1.0) / 2.0
-        self.set_joint_pos(new_joint_pos, new_gripper_pos)
+                
+        # 使用带超时的方式执行机械臂控制命令
+        self._step_with_timeout(new_joint_pos, new_gripper_pos, timeout=0.5)
+
 
         # 更新卡住检测（每步只调用一次）
         self.update_stuck_detection()
@@ -725,6 +715,31 @@ class PiperRobot:
             self._update_obj_position_sim(action)
 
         time.sleep(dt * 5)  # dt*5 = 0.05s，配合速度参数实现 2-3 cm/s 的末端速度
+            
+    def _step_with_timeout(self, joint_pos, gripper_pos, timeout=0.5):
+        """使用线程超时机制执行机械臂命令，避免 CAN 阻塞"""
+        result = {'error': None, 'done': False}
+        
+        def _target():
+            try:
+                self.set_joint_pos(joint_pos, gripper_pos)
+            except Exception as e:
+                result['error'] = e
+            finally:
+                result['done'] = True
+        
+        thread = threading.Thread(target=_target, daemon=True)
+        thread.start()
+        thread.join(timeout=timeout)
+        
+        if thread.is_alive():
+            # 线程超时，尝试恢复机械臂
+            print(f"[超时] 机械臂命令执行超时 ({timeout}s)，尝试恢复...")
+            self._recover_arm()
+        elif result['error']:
+            # 执行出错
+            print(f"[错误] 机械臂命令执行失败: {result['error']}")
+            self._recover_arm()
         
     def close(self):
         if self.piper is not None:
