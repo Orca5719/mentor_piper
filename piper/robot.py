@@ -99,19 +99,26 @@ class PiperRobot:
                 self.piper = PiperSDK("can0")
                 self.piper.ConnectPort()
                 
-                # 等待机械臂连接稳定
-                time.sleep(0.1)
+                # 等待机械臂连接稳定（增加等待时间）
+                time.sleep(0.5)
                 
                 # 使能机械臂，带重试机制
-                max_retries = 10
+                max_retries = 20  # 增加重试次数
                 for attempt in range(max_retries):
-                    if self.piper.EnablePiper():
-                        break
-                    time.sleep(0.05)
+                    try:
+                        if self.piper.EnablePiper():
+                            print(f"✓ 机械臂使能成功（尝试 {attempt + 1}/{max_retries}）")
+                            break
+                    except Exception as e:
+                        print(f"使能尝试 {attempt + 1}/{max_retries} 失败: {e}")
+                    
+                    if attempt < max_retries - 1:
+                        time.sleep(0.2)  # 增加等待时间
                 else:
+                    print("警告：机械臂使能失败，将使用模拟模式")
                     raise RuntimeError("机械臂使能失败，请检查CAN连接和电源")
                 
-                # 设置夹爪初始状态 (完全关闭)
+                # 设置夹爪初始状态
                 try:
                     self.piper.GripperCtrl(0, 1000, 0x01, 0)
                     time.sleep(0.05)
@@ -348,14 +355,15 @@ class PiperRobot:
             try:
                 spd = speed if speed is not None else 20  # 超低速模式，约 1-2 cm/s 的末端速度
                 
-                # 关节角度限制（单位：弧度）- 扩大范围以避免卡住
+                # 关节角度限制（单位：弧度）- 已在 SDK 初始化时设置
+                # SDK 会自动限制关节角度，这里只需要检查变化量
                 joint_limits = [
-                    (-2.6179, 2.6179),  # Joint 1: [-150°, 150°]
-                    (-1.57, 3.14),      # Joint 2: [-90° 到 180°] (扩大向下范围)
-                    (-3.1416, 0.1745),  # Joint 3: [-180° 到 10°]
-                    (-1.745, 1.745),    # Joint 4: [-100° 到 100°]
-                    (-1.22, 1.22),      # Joint 5: [-70° 到 70°]
-                    (-2.09439, 2.09439) # Joint 6: [-120° 到 120°]
+                    (-2.6179, 2.6179),  # Joint 1: [-150°, 150°] (SDK 限制)
+                    (-0.1745, 3.14),    # Joint 2: [-10° 到 180°] (原 0° 到 180°，向下扩展 10°)
+                    (-3.1416, 0.1745),  # Joint 3: [-180° 到 10°] (原 -170° 到 0°，向下扩展 10°)
+                    (-1.745, 1.745),    # Joint 4: [-100° 到 100°] (保持 SDK 限制)
+                    (-1.22, 1.22),      # Joint 5: [-70° 到 70°] (保持 SDK 限制)
+                    (-2.09439, 2.09439) # Joint 6: [-120° 到 120°] (保持 SDK 限制)
                 ]
                 
                 # 限制关节角度在安全范围内（双重保护）
@@ -388,8 +396,7 @@ class PiperRobot:
                 joint_4 = round(joint_pos_clipped[4] * self.factor)
                 joint_5 = round(joint_pos_clipped[5] * self.factor)
                 
-                # gripper_angle 单位是 0.001mm，典型夹爪行程约 50mm，所以用 0-50000
-                gripper_cmd = round(abs(self.gripper_pos) * 50000)
+                gripper_cmd = round(abs(self.gripper_pos) * 1000 * 1000)
                 
                 if self.debug_mode:
                     print(f"[DEBUG] joint_0-5: {joint_0}, {joint_1}, {joint_2}, {joint_3}, {joint_4}, {joint_5}")
@@ -473,62 +480,60 @@ class PiperRobot:
                 print(f"获取末端位置错误：{e}")
         return self.current_end_effector_pos.copy()
     
-    def move_end_effector_delta(self, dx=0, dy=0, dz=0, gripper=0, scale=0.1):
+    def move_end_effector_delta(self, dx=0, dy=0, dz=0, gripper=0, scale=0.02):
         """
-        简化的笛卡尔方向控制
-        
-        控制映射：
-        - dx (左右): 关节0 (基座旋转)
-        - dy (前后): 关节1 (肩部俯仰)  
-        - dz (上下): 关节3 (腕部俯仰)
-        - W/S 通过空格独立控制夹爪
+        笛卡尔空间末端移动（简化版，使用伪逆雅可比近似）
         
         Args:
-            dx: X轴增量（左右） -> 关节0
-            dy: Y轴增量（前后） -> 关节1
-            dz: Z轴增量（上下） -> 关节3
+            dx, dy, dz: 末端位置的增量（米）
             gripper: 夹爪位置 (-1 到 1)
             scale: 移动缩放因子
+            
+        Returns:
+            执行后的末端实际位置
         """
-        # 获取当前关节位置
-        current_joints = self.current_joint_pos.copy()
+        # 获取当前末端位置
+        current_pos = self.get_end_effector_pos()
         
-        # 简化的关节映射 - 每个轴对应一个主要关节
-        joint_delta = np.zeros(6)
-        joint_delta[0] = dx * scale * 1.5   # 关节0: 左右旋转 (X轴)
-        joint_delta[1] = dy * scale         # 关节1: 前后俯仰 (Y轴)
-        joint_delta[2] = 0                  # 关节2: 保持不变
-        joint_delta[3] = dz * scale         # 关节3: 上下俯仰 (Z轴)
-        joint_delta[4] = 0                  # 关节4: 保持不变
-        joint_delta[5] = 0                  # 关节5: 保持不变
+        # 计算新位置
+        new_pos = current_pos + np.array([dx, dy, dz]) * scale
         
-        # 计算新关节位置
-        new_joints = current_joints + joint_delta
+        # 简单限幅
+        new_pos = np.clip(new_pos, 
+                         [0.1, -0.15, 0.03],  # 最小位置（米）
+                         [0.35, 0.25, 0.32])  # 最大位置（米）
         
-        # Piper 关节安全限幅（弧度）- 扩大范围以避免卡住
-        joint_limits = np.array([
-            [-2.0, 2.0],      # 关节0: ±115°
-            [-1.5, 3.0],      # 关节1: -86° ~ +172°
-            [-3.0, 1.5],      # 关节2: ±86°
-            [-1.5, 1.5],      # 关节3: ±86°
-            [-1.5, 1.5],      # 关节4: ±86°
-            [-5.0, 5.0]       # 关节5: 无限制
+        # 简化的笛卡尔到关节转换
+        # 使用当前关节位置 + 伪逆雅可比近似
+        delta_pos = new_pos - current_pos
+        
+        # 简化雅可比矩阵（假设 6DOF 臂，主要影响前 3 个关节）
+        # 这是一个近似，实际需要精确的雅可比
+        jacobian_inv = np.array([
+            [0.5, 0.3, 0.1],   # X 影响
+            [0.1, 0.6, 0.2],   # Y 影响
+            [0.0, 0.2, 0.5],   # Z 影响
+            [0.0, 0.0, 0.0],
+            [0.0, 0.0, 0.0],
+            [0.0, 0.0, 0.0]
         ])
         
-        new_joints = np.clip(new_joints, joint_limits[:, 0], joint_limits[:, 1])
+        # 计算关节增量
+        joint_delta = jacobian_inv @ delta_pos
+        
+        # 添加到当前关节位置
+        new_joint_pos = self.current_joint_pos + joint_delta
+        
+        # 限幅关节位置
+        new_joint_pos = np.clip(new_joint_pos, 
+                                np.array([-1.5, -0.5, -2.0, -2.0, -2.5, -3.0]),
+                                np.array([1.5, 1.5, 0.5, 2.0, 2.5, 3.0]))
         
         # 设置夹爪
-        gripper_pos = np.clip((gripper + 1.0) / 2.0, 0.0, 1.0)
-        
-        # 记录夹爪位置用于调试
-        self.gripper_pos = gripper_pos
+        gripper_pos = (gripper + 1.0) / 2.0  # -1~1 转为 0~1
         
         # 执行移动
-        self.set_joint_pos(new_joints, gripper_pos)
-        
-        # 模拟模式下打印夹爪状态
-        if self.use_sim and self.debug_mode:
-            print(f"[DEBUG] 夹爪: {gripper_pos:.2f} ({'打开' if gripper_pos > 0.5 else '关闭'})")
+        self.set_joint_pos(new_joint_pos, gripper_pos)
         
         return self.get_end_effector_pos()
             
