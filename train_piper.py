@@ -25,6 +25,7 @@ import re
 
 from utils import models_tuple
 from copy import deepcopy
+from tqdm import tqdm
 
 torch.backends.cudnn.benchmark = True
 
@@ -39,9 +40,9 @@ class Workspace:
     def __init__(self, cfg):
         self.work_dir = Path.cwd()
         self.cfg = cfg
-        print("#"*20)
-        print(f'\nworkspace: {self.work_dir}')
-        print(self.cfg)
+        print("#"*50)
+        print(f'\n工作目录: {self.work_dir}')
+        print("#"*50)
         self.last_save_step = -9999
         if self.cfg.use_wandb:
             exp_name = '_'.join([cfg.task_name, str(cfg.seed)])
@@ -83,38 +84,40 @@ class Workspace:
         visualize = getattr(self.cfg, 'visualize', False)
         obj_pos = getattr(self.cfg, 'obj_pos', None)
         goal_pos = getattr(self.cfg, 'goal_pos', None)
-        print_reward = getattr(self.cfg, 'print_reward', True)
-        debug_mode = getattr(self.cfg, 'debug_mode', False)
         use_apriltag = getattr(self.cfg, 'use_apriltag', False)
         tag_size = getattr(self.cfg, 'tag_size', 0.05)
+        camera_calibration_file = getattr(self.cfg, 'camera_calibration_file', 'camera_calibration.npz')
+        hand_eye_calibration_file = getattr(self.cfg, 'hand_eye_calibration_file', 'simple_hand_eye.json')
         
         self.train_env = piper_env.make(
             self.cfg.task_name, 
-            self.cfg.frame_stack,
-            self.cfg.action_repeat, 
             self.cfg.seed,
+            self.cfg.action_repeat,
+            (256, 256),
             use_sim=use_sim,
             visualize=visualize,
             obj_pos=obj_pos,
             goal_pos=goal_pos,
-            print_reward=print_reward,
-            debug_mode=debug_mode,
             use_apriltag=use_apriltag,
-            tag_size=tag_size
+            tag_size=tag_size,
+            camera_calibration_file=camera_calibration_file,
+            hand_eye_calibration_file=hand_eye_calibration_file,
+            frame_stack=self.cfg.frame_stack
         )
         self.eval_env = piper_env.make(
             self.cfg.task_name, 
-            self.cfg.frame_stack,
-            self.cfg.action_repeat, 
             self.cfg.seed,
+            self.cfg.action_repeat,
+            (256, 256),
             use_sim=True,
             visualize=False,
             obj_pos=obj_pos,
             goal_pos=goal_pos,
-            print_reward=False,
-            debug_mode=False,
             use_apriltag=False,
-            tag_size=tag_size
+            tag_size=tag_size,
+            camera_calibration_file=camera_calibration_file,
+            hand_eye_calibration_file=hand_eye_calibration_file,
+            frame_stack=self.cfg.frame_stack
         )
         
         data_specs = (self.train_env.observation_spec(),
@@ -173,6 +176,7 @@ class Workspace:
         step, episode, total_reward, total_sr = 0, 0, 0, 0
         eval_until_episode = utils.Until(self.cfg.num_eval_episodes)
 
+        pbar = tqdm(total=self.cfg.num_eval_episodes, desc='评估中', leave=False)
         while eval_until_episode(episode):
             episode_sr = False
             time_step = self.eval_env.reset()
@@ -190,13 +194,18 @@ class Workspace:
 
             total_sr += episode_sr
             episode += 1
+            pbar.update(1)
             self.video_recorder.save(f'{self.global_frame}.mp4')
+        pbar.close()
+        
         with self.logger.log_and_dump_ctx(self.global_frame, ty='eval') as log:
             log('episode_success_rate', total_sr / episode)
             log('episode_reward', total_reward / episode)
             log('episode_length', step * self.cfg.action_repeat / episode)
             log('episode', self.global_episode)
             log('step', self.global_step)
+        
+        print(f"\n[评估完成] 成功率: {total_sr/episode:.2%}, 平均奖励: {total_reward/episode:.2f}")
 
     def train(self):
         train_until_step = utils.Until(self.cfg.num_train_frames,
@@ -210,7 +219,11 @@ class Workspace:
         time_step = self.train_env.reset()
         self.replay_storage.add(time_step)
         metrics = None
-        print("start training")
+        print("\n开始训练...")
+        
+        total_steps = self.cfg.num_train_frames // self.cfg.action_repeat
+        pbar = tqdm(total=total_steps, desc='训练进度', unit='step')
+        
         while train_until_step(self.global_step):
             if time_step.last():
                 self._global_episode += 1
@@ -245,9 +258,11 @@ class Workspace:
                 episode_reward = 0
 
             if eval_every_step(self.global_step):
+                pbar.set_description('评估中...')
                 self.logger.log('eval_total_time', self.timer.total_time(),
                                 self.global_frame)
                 self.eval()
+                pbar.set_description('训练进度')
 
             with torch.no_grad(), utils.eval_mode(self.agent):
                 action = self.agent.act(time_step.observation,
@@ -267,6 +282,16 @@ class Workspace:
             self.replay_storage.add(time_step)
             episode_step += 1
             self._global_step += 1
+            pbar.update(1)
+            
+            pbar.set_postfix({
+                'episode': self.global_episode,
+                'reward': f'{episode_reward:.1f}',
+                'success': 'Yes' if episode_sr else 'No'
+            })
+        
+        pbar.close()
+        print("\n训练完成！")
 
     def save_snapshot(self, step_id=None):
         if step_id is None:
@@ -279,6 +304,7 @@ class Workspace:
         payload = {k: self.__dict__[k] for k in keys_to_save}
         with snapshot.open('wb') as f:
             torch.save(payload, f)
+        print(f"模型已保存: {snapshot}")
 
     def load_snapshot(self, step_id=None, snapshot_path=None):
         if snapshot_path:
@@ -293,6 +319,7 @@ class Workspace:
             payload = torch.load(f)
         for k, v in payload.items():
             self.__dict__[k] = v
+        print(f"模型已加载: {snapshot}")
 
 
 @hydra.main(config_path='piper/cfgs', config_name='config')
@@ -311,13 +338,13 @@ def main(cfgs):
     
     snapshot = Path(snapshot_path)
     if snapshot.exists():
-        print(f'resuming: {snapshot}')
+        print(f'从 {snapshot} 恢复训练...')
         workspace.load_snapshot(snapshot_path=str(snapshot))
     else:
-        print(f'No snapshot found at {snapshot}')
+        print(f'未找到模型 {snapshot}，从头开始训练')
     
     if hasattr(cfgs, 'eval_only') and cfgs.eval_only:
-        print('Running evaluation only...')
+        print('仅运行评估...')
         workspace.eval()
     else:
         workspace.train()

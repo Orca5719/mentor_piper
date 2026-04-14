@@ -1,110 +1,112 @@
-# experiment
-frame_stack: 3
-action_repeat: 2
-discount: 0.997
-num_seed_frames: 8000  # 增加随机种子帧数（原 4000）
-update_every_steps: 2
-eval_every_frames: 10000
-num_eval_episodes: 10
-save_snapshot: true
-save_interval: 10000
-load_from_id: false
-load_id: 0
-snapshot_path: ''
-eval_only: false
+# ==============================================
+# Piper 机械臂训练配置文件
+# ==============================================
 
-# wandb
-use_wandb: false
+# ==================== 实验基础设置 ====================
+frame_stack: 3                    # 帧堆叠数量，用于捕捉运动信息
+action_repeat: 2                  # 动作重复次数，减少采样频率
+discount: 0.997                   # 奖励折扣因子，未来奖励的重要性
+num_seed_frames: 8000             # 随机策略采样帧数，用于填充经验池
+update_every_steps: 2             # 每多少步更新一次网络
+eval_every_frames: 10000          # 每多少帧进行一次评估
+num_eval_episodes: 10             # 每次评估的 episode 数量
+save_snapshot: true                # 是否保存模型快照
+save_interval: 10000              # 每隔多少步保存一次模型
+load_from_id: false               # 是否从指定 ID 加载模型
+load_id: 0                        # 要加载的模型 ID
+snapshot_path: ''                 # 模型快照路径（留空则使用默认路径）
+eval_only: false                  # 是否只进行评估，不训练
 
-# replay buffer
-replay_buffer_size: 1000000
-replay_buffer_num_workers: 4
-nstep: 3
-batch_size: 256
+# ==================== 日志和可视化 ====================
+use_wandb: false                  # 是否使用 wandb 进行实验记录
+use_tb: true                      # 是否使用 TensorBoard 记录训练过程
+save_video: true                  # 是否保存评估视频
+save_train_video: false           # 是否保存训练视频
+experiment: exp                   # 实验名称
 
-# training
-seed: 0
-device: cuda:0
-save_video: true
-save_train_video: false
-use_tb: true
-experiment: exp
-lr: 0.0001
-feature_dim: 50
-num_train_frames: 2100000
+# ==================== 训练参数 ====================
+seed: 0                           # 随机种子，用于可复现性
+device: cuda:0                    # 训练设备，使用 GPU
+lr: 0.0001                        # 学习率
+feature_dim: 50                   # 特征维度
+num_train_frames: 2100000        # 总训练帧数
 
-# piper specific
-use_sim: false  # 设置为 false 使用真实机械臂，true 使用模拟
-visualize: true  # 设置为 true 在训练时显示摄像头画面
-print_reward: true  # 设置为 true 在训练时打印 reward 信息
-debug_mode: false  # 设置为 true 打印详细调试信息，false 只打印训练相关信息
+# ==================== 经验回放缓冲区 ====================
+replay_buffer_size: 1000000      # 经验池最大容量
+replay_buffer_num_workers: 4      # 经验池加载的工作进程数
+nstep: 3                          # n-step 回报的步数
+batch_size: 256                   # 训练批次大小
 
-# AprilTag 物体追踪设置
-use_apriltag: true  # 设置为 true 使用 AprilTag 检测物体位置（真实世界）
-tag_size: 0.05  # AprilTag 的物理大小（单位：米），请根据实际打印大小调整
+# ==================== Piper 机械臂专属设置 ====================
+use_sim: false                    # 是否使用模拟环境（true=模拟，false=真实机械臂）
+visualize: true                   # 是否显示摄像头画面
 
-# 目标位置设置 (单位: 米)
-# X: 左右方向 (右为正)
-# Y: 前后方向 (前为正)
-# Z: 上下方向 (上为正)
-goal_pos: [0.0, 0.75, 0.0]  # 默认目标位置（请根据实际情况调整）
-obj_pos: [0.0, 0.6, 0.0]    # 默认物体初始位置（请根据实际情况调整）
+# ==================== AprilTag 物体追踪 ====================
+use_apriltag: true                # 是否使用 AprilTag 检测物体位置
+tag_size: 0.05                    # AprilTag 的物理大小（单位：米）
 
-# nstep alpha schedule
-nstep_alpha_temp: 1000000
-discount_alpha_temp: 500000
-discount_beta_temp: 1600000
+# ==================== 目标和物体位置 ====================
+# 坐标系说明：
+# X: 左右方向（右为正）
+# Y: 前后方向（前为正）
+# Z: 上下方向（上为正）
+goal_pos: [0.0, 0.75, 0.0]       # 目标位置（单位：米）
+obj_pos: [0.0, 0.6, 0.0]         # 物体初始位置（单位：米）
 
-# stddev schedule - 增加探索性，避免动作过于相似
-# 初始 stddev 更大，衰减更慢，最终 stddev 更大
-stddev_schedule: linear(1.5,0.3,1000000)
+# ==================== N-step 和折扣调度 ====================
+nstep_alpha_temp: 1000000        # n-step alpha 衰减温度
+discount_alpha_temp: 500000       # discount alpha 衰减温度
+discount_beta_temp: 1600000       # discount beta 衰减温度
 
-# mentor
-nstep_alpha: 7
-discount_alpha: 0.02
-discount_beta: 0.007
+# ==================== 动作标准差调度（探索） ====================
+stddev_schedule: linear(1.5,0.3,1000000)  # 标准差调度策略
 
-# task
-task_name: piper_push
+# ==================== MENTOR 算法参数 ====================
+nstep_alpha: 7                    # n-step alpha
+discount_alpha: 0.02              # discount alpha
+discount_beta: 0.007              # discount beta
 
-# agent
+# ==================== 任务设置 ====================
+task_name: piper_push             # 任务名称
+
+# ==================== Agent 配置 ====================
 agent:
   _target_: agents.mentor_mw.MENTORAgent
   obs_shape: ???
   action_shape: ???
   device: ${device}
   lr: ${lr}
-  critic_target_tau: 0.01
-  dormant_threshold: 0.025
-  target_dormant_ratio: 0.2
-  target_lambda: 0.5
-  dormant_temp: 10
-  lambda_temp: 50
-  perturb_interval: 50000
-  min_perturb_factor: 0.2
-  max_perturb_factor: 0.95
-  perturb_rate: 2
+  critic_target_tau: 0.01          # 目标网络更新速率
+  dormant_threshold: 0.025          # 专家休眠阈值
+  target_dormant_ratio: 0.2        # 目标休眠比例
+  target_lambda: 0.5                # 目标 lambda
+  dormant_temp: 10                  # 休眠温度
+  lambda_temp: 50                   # lambda 温度
+  perturb_interval: 50000           # 扰动间隔
+  min_perturb_factor: 0.2          # 最小扰动因子
+  max_perturb_factor: 0.95         # 最大扰动因子
+  perturb_rate: 2                   # 扰动率
   use_tb: ${use_tb}
-  num_expl_steps: 5000  # 增加探索步数（原 2000）
-  hidden_dim: 1024
+  num_expl_steps: 5000              # 探索步数
+  hidden_dim: 1024                  # 隐藏层维度
   feature_dim: ${feature_dim}
-  stddev_type: awake
+  stddev_type: awake                # 标准差类型
   stddev_schedule: ${stddev_schedule}
-  stddev_clip: 0.5  # 增加最大探索范围（原 0.3）
-  expectile: 0.9
-  lr_actor_ratio: 1
-  aux_loss_scale_warmup: -1
-  aux_loss_scale_warmsteps: -1
-  aux_loss_scale: 0.002
-  aux_loss_type: ''
-  encoder_type: scratch
-  resnet_fix: true
-  oneXone_reg_scale: 0.0
-  oneXone_reg_ratio: 0.5
-  pretrained_factor: 1.0
-  tp_set_size: 10
-  moe_gate_dim: 256
-  moe_hidden_dim: 256
-  num_experts: 16
-  top_k: 4
-  dropout: 0.1
+  stddev_clip: 0.5                  # 最大标准差裁剪
+  expectile: 0.9                    # expectile 参数
+  lr_actor_ratio: 1                 # Actor 学习率比例
+  aux_loss_scale_warmup: -1         # 辅助损失 scale 预热
+  aux_loss_scale_warmsteps: -1      # 辅助损失 scale 预热步数
+  aux_loss_scale: 0.002             # 辅助损失 scale
+  aux_loss_type: ''                 # 辅助损失类型
+  encoder_type: scratch              # 编码器类型
+  resnet_fix: true                   # 是否固定 ResNet
+  oneXone_reg_scale: 0.0            # 1x1 正则化 scale
+  oneXone_reg_ratio: 0.5            # 1x1 正则化比例
+  pretrained_factor: 1.0             # 预训练因子
+  tp_set_size: 10                    # Top Policy 集合大小
+  moe_gate_dim: 256                  # MoE Gate 维度
+  moe_hidden_dim: 256                # MoE 隐藏层维度
+  num_experts: 16                    # 专家数量
+  top_k: 4                           # Top-K 专家
+  dropout: 0.1                       # Dropout 率

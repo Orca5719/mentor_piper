@@ -3,47 +3,6 @@ import time
 import cv2
 import os
 
-# ============================================
-# 📌 Piper 机械臂配置区域 - 在这里修改初始位置和限制
-# ============================================
-#
-# 初始位置（关节角度，单位：弧度）
-# 每次环境 reset 时会回到这个位置
-#
-# 注意：如果需要使用示教模式来设置初始位置：
-# 1. 运行 test_piper_camera.py 或使用示教按钮手动移动机械臂
-# 2. 记录下满意的关节角度
-# 3. 将角度转换为弧度（1度 = π/180 弧度）
-# 4. 填入下方的 INITIAL_JOINT_POS
-#
-# ============================================
-
-# 初始关节位置（弧度）- 每次 reset 时回到这个位置
-# 示例：[0.0, 1.57, -1.57, 0.0, 0.0, 0.0] 对应 0°, 90°, -90°, 0°, 0°, 0°
-INITIAL_JOINT_POS = [0.0116, 0.7366, -0.4097, -0.0418, 0.4053, -0.1915]
-
-# ============================================
-# 机械臂末端位置限制（毫米）
-# 如果需要启用限制，设置 ENABLE_POSITION_LIMITS = True
-# ============================================
-ENABLE_POSITION_LIMITS = True
-
-# X 轴限制（毫米）
-MIN_X_MM = 85486.0   # X 轴最小值
-MAX_X_MM = 200000.0  # X 轴最大值（可根据实际情况调整）
-
-# Y 轴限制（毫米）
-MIN_Y_MM = -100000.0 # Y 轴最小值（可根据实际情况调整）
-MAX_Y_MM = 100000.0  # Y 轴最大值（可根据实际情况调整）
-
-# Z 轴限制（毫米）
-MIN_Z_MM = 113787.0  # Z 轴最小值
-MAX_Z_MM = 300000.0  # Z 轴最大值（可根据实际情况调整）
-
-# ============================================
-# 📌 配置区域结束
-# ============================================
-
 try:
     from piper_sdk import *
     PiperSDK = C_PiperInterface_V2
@@ -57,34 +16,32 @@ except ImportError:
     print("警告：Camera_Module 未找到，相机功能不可用")
     DepthCameraModule = None
 
-# AprilTag 支持
 try:
     from pupil_apriltags import Detector
     HAS_APRILTAGS = True
 except ImportError:
     print("警告：pupil-apriltags 未安装，AprilTag 功能不可用")
-    print("运行: pip install pupil-apriltags")
     HAS_APRILTAGS = False
 
 
 class PiperRobot:
     def __init__(self, use_sim=False, camera_width=256, camera_height=256,
                  obj_pos=None, goal_pos=None,
-                 debug_mode=False,
                  use_apriltag=False, tag_size=0.05,
                  camera_calibration_file='camera_calibration.npz',
-                 hand_eye_calibration_file='hand_eye_calibration.npz'):
+                 hand_eye_calibration_file='simple_hand_eye.json'):
         self.use_sim = use_sim
         self.camera_width = camera_width
         self.camera_height = camera_height
         self.use_apriltag = use_apriltag
         self.tag_size = tag_size
-        self.debug_mode = debug_mode
         
         self.piper = None
-        self.factor = 57295.7795
         self.gripper_pos = 0
         self.apriltag_visible = False
+        
+        self.current_end_pos = np.array([0.3, 0.0, 0.2])
+        self.current_end_rpy = np.array([-3.1416, 0.4189, 3.1416])
         
         if not use_sim and PiperSDK is not None:
             try:
@@ -95,35 +52,13 @@ class PiperRobot:
                     time.sleep(0.01)
                 
                 self.piper.GripperCtrl(0, 1000, 0x01, 0)
-                # 多次调用确保模式切换成功
-                for _ in range(3):
-                    self.piper.ModeCtrl(0x01, 0x01, 30, 0x00)
-                    self.piper.EnableArm(7, 0x02)
-                    time.sleep(0.05)
-                # 清除所有关节错误并配置加速度
-                self.piper.JointConfig(7, 0x00, 0x00, 500, 0xAE)
+                
+                self.piper.MotionCtrl_2(0x01, 0x00, 100, 0x00)
                 time.sleep(0.1)
                 
-                # 使用 SDK 原生功能设置关节限制（更可靠）
-                # 设置 Joint 1: [-150°, 150°] = [-2.6179, 2.6179] rad
-                self.piper.SetSDKJointLimitParam("j1", -2.6179, 2.6179)
-                # 设置 Joint 2: [-10°, 180°] = [-0.1745, 3.14] rad
-                self.piper.SetSDKJointLimitParam("j2", -0.1745, 3.14)
-                # 设置 Joint 3: [-180°, 10°] = [-3.1416, 0.1745] rad
-                self.piper.SetSDKJointLimitParam("j3", -3.1416, 0.1745)
-                # 设置 Joint 4: [-100°, 100°] = [-1.745, 1.745] rad
-                self.piper.SetSDKJointLimitParam("j4", -1.745, 1.745)
-                # 设置 Joint 5: [-70°, 70°] = [-1.22, 1.22] rad
-                self.piper.SetSDKJointLimitParam("j5", -1.22, 1.22)
-                # 设置 Joint 6: [-120°, 120°] = [-2.09439, 2.09439] rad
-                self.piper.SetSDKJointLimitParam("j6", -2.09439, 2.09439)
-                time.sleep(0.05)
-                
-                print("✓ 机械臂连接成功，关节限制已设置")
+                print("✓ 机械臂连接成功")
             except Exception as e:
                 print(f"警告：无法连接机械臂：{e}，将使用模拟模式")
-                import traceback
-                traceback.print_exc()
                 self.use_sim = True
                 self.piper = None
         
@@ -141,9 +76,6 @@ class PiperRobot:
                 print(f"警告：无法初始化相机：{e}")
                 self.camera = None
         
-        self.current_joint_pos = np.zeros(6)
-        self.current_end_effector_pos = np.zeros(3)
-        
         if obj_pos is None:
             self.obj_pos = np.array([0.0, 0.6, 0.0])
         else:
@@ -153,36 +85,20 @@ class PiperRobot:
             self.goal_pos = np.array([0.0, 0.75, 0.0])
         else:
             self.goal_pos = np.array(goal_pos)
-            
-        self.move_spd_rate_ctrl = 50
         
-        # 机械臂卡住检测和限制检测
-        self.last_joint_pos = None
-        self.stuck_counter = 0
-        self.safe_joint_pos = None  # 上一个安全的关节位置
-        self.last_valid_joint_pos = None  # 最后一个有效的关节位置（用于限制变化量）
-        self.position_limit_violated = False  # 位置限制是否被触发
-        self.stuck_threshold = 15  # 连续多少步认为卡住（已放宽）
-        
-        # AprilTag 初始化
+        self.hand_eye_offset = None
+        self.T_cam2robot = None
         self.apriltag_detector = None
         self.camera_params = None
-        self.T_cam2robot = None
         self.last_detected_obj_pos = None
         
         if not use_sim and use_apriltag and HAS_APRILTAGS:
             self._init_apriltag(camera_calibration_file, hand_eye_calibration_file)
-        
-        if self.use_sim:
-            self._update_end_effector_pos_sim()
     
     def _init_apriltag(self, camera_calibration_file, hand_eye_calibration_file):
-        """初始化 AprilTag 检测器"""
         try:
-            # 获取脚本所在目录，支持相对路径
             script_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
             
-            # 加载相机标定 - 尝试多个路径
             cam_calib_paths = [
                 camera_calibration_file,
                 os.path.join(script_dir, camera_calibration_file),
@@ -207,14 +123,8 @@ class PiperRobot:
                 print(f"✓ 加载相机标定: {cam_file_found}")
             else:
                 print(f"⚠️  未找到相机标定文件")
-                print(f"   尝试路径: {cam_calib_paths}")
-                print("   AprilTag 将无法估计 3D 位置")
             
-            # 尝试加载手眼标定（优先简单标定）
-            self.hand_eye_offset = None
-            self.T_cam2robot = None
-            
-            # 尝试手眼标定文件 - 多个路径
+            import json
             hand_eye_paths = [
                 'simple_hand_eye.json',
                 os.path.join(script_dir, 'simple_hand_eye.json'),
@@ -223,34 +133,20 @@ class PiperRobot:
             ]
             
             hand_eye_file_found = None
-            hand_eye_type = None
-            
             for path in hand_eye_paths:
                 if os.path.exists(path):
                     hand_eye_file_found = path
-                    if 'simple' in path:
-                        hand_eye_type = 'simple'
-                    else:
-                        hand_eye_type = 'full'
                     break
             
-            if hand_eye_file_found and hand_eye_type == 'simple':
-                import json
+            if hand_eye_file_found:
                 with open(hand_eye_file_found, 'r') as f:
                     calib_data = json.load(f)
-                self.hand_eye_offset = np.array(calib_data['offset'])
+                if 'camera_to_robot_offset' in calib_data:
+                    self.hand_eye_offset = np.array(calib_data['camera_to_robot_offset'])
+                elif 'offset' in calib_data:
+                    self.hand_eye_offset = np.array(calib_data['offset'])
                 print(f"✓ 加载简单手眼标定: {hand_eye_file_found}")
-                print(f"  偏移量: {self.hand_eye_offset}")
-            elif hand_eye_file_found and hand_eye_type == 'full':
-                data = np.load(hand_eye_file_found)
-                self.T_cam2robot = data['T_cam2gripper']
-                print(f"✓ 加载完整手眼标定: {hand_eye_file_found}")
-            else:
-                print(f"⚠️  未找到手眼标定文件")
-                print(f"   请先运行 easy_hand_eye_calibration.py")
-                print("   将使用简单坐标转换（可能不准确）")
             
-            # 初始化检测器
             self.apriltag_detector = Detector(
                 families='tag36h11',
                 nthreads=1,
@@ -267,202 +163,66 @@ class PiperRobot:
             print(f"✗ AprilTag 初始化失败: {e}")
             self.apriltag_detector = None
     
-    def _update_end_effector_pos_sim(self):
-        self.current_end_effector_pos = np.array([
-            np.sin(self.current_joint_pos[0]) * 0.3,
-            np.cos(self.current_joint_pos[1]) * 0.3,
-            np.sin(self.current_joint_pos[2]) * 0.1 + 0.2
-        ])
-        
-    def _update_obj_position_sim(self, action):
-        dist_to_obj = np.linalg.norm(self.current_end_effector_pos - self.obj_pos)
-        if dist_to_obj < 0.05:
-            target_pos = self.goal_pos
-            push_dir = target_pos[:2] - self.obj_pos[:2]
-            if np.linalg.norm(push_dir) > 0.001:
-                push_dir = push_dir / np.linalg.norm(push_dir)
-                self.obj_pos[:2] += push_dir * 0.005
-                
-    def get_joint_pos(self):
-        if not self.use_sim and self.piper is not None:
-            try:
-                joint_pose = self.piper.GetArmJointMsgs()
-                self.current_joint_pos = np.array([
-                    joint_pose.joint_state.joint_1 / self.factor,
-                    joint_pose.joint_state.joint_2 / self.factor,
-                    joint_pose.joint_state.joint_3 / self.factor,
-                    joint_pose.joint_state.joint_4 / self.factor,
-                    joint_pose.joint_state.joint_5 / self.factor,
-                    joint_pose.joint_state.joint_6 / self.factor
-                ])
-            except Exception as e:
-                print(f"获取关节位置错误：{e}")
-        return self.current_joint_pos.copy()
-        
-    def set_joint_pos(self, joint_pos, gripper_pos=None, speed=None):
-        joint_pos = np.array(joint_pos)
-        
-        if gripper_pos is not None:
-            self.gripper_pos = gripper_pos
-        
-        # 重置位置限制触发标志
-        self.position_limit_violated = False
-        
-        if not self.use_sim and self.piper is not None:
-            try:
-                spd = speed if speed is not None else 100
-                
-                # 关节角度限制（单位：弧度）- 已在 SDK 初始化时设置
-                # SDK 会自动限制关节角度，这里只需要检查变化量
-                joint_limits = [
-                    (-2.6179, 2.6179),  # Joint 1: [-150°, 150°] (SDK 限制)
-                    (-0.1745, 3.14),    # Joint 2: [-10° 到 180°] (原 0° 到 180°，向下扩展 10°)
-                    (-3.1416, 0.1745),  # Joint 3: [-180° 到 10°] (原 -170° 到 0°，向下扩展 10°)
-                    (-1.745, 1.745),    # Joint 4: [-100° 到 100°] (保持 SDK 限制)
-                    (-1.22, 1.22),      # Joint 5: [-70° 到 70°] (保持 SDK 限制)
-                    (-2.09439, 2.09439) # Joint 6: [-120° 到 120°] (保持 SDK 限制)
-                ]
-                
-                # 限制关节角度在安全范围内（双重保护）
-                joint_pos_clipped = np.clip(joint_pos, 
-                                            [lim[0] for lim in joint_limits],
-                                            [lim[1] for lim in joint_limits])
-                
-                # 安全检查：如果关节角度被裁剪，说明 RL 发出了危险指令
-                if np.any(np.abs(joint_pos_clipped - joint_pos) > 0.01):
-                    if self.debug_mode:
-                        print(f"[安全警告] 关节角度超出限制，已自动裁剪")
-                        print(f"  原始：{joint_pos}")
-                        print(f"  裁剪：{joint_pos_clipped}")
-                
-                # 检查关节变化量，避免突变导致 CAN 通信问题
-                if self.last_valid_joint_pos is not None:
-                    delta = np.abs(joint_pos_clipped - self.last_valid_joint_pos)
-                    max_delta = np.max(delta)
-                    if max_delta > 1.0:  # 单次移动不超过 1.0 弧度（约 57.3 度），放宽限制以允许更多探索
-                        if self.debug_mode:
-                            print(f"[安全警告] 关节变化量过大 ({max_delta:.3f} rad)，限制在 1.0 rad 以内")
-                        # 限制最大变化量
-                        scale = 1.0 / max_delta
-                        joint_pos_clipped = self.last_valid_joint_pos + (joint_pos_clipped - self.last_valid_joint_pos) * scale
-                
-                joint_0 = round(joint_pos_clipped[0] * self.factor)
-                joint_1 = round(joint_pos_clipped[1] * self.factor)
-                joint_2 = round(joint_pos_clipped[2] * self.factor)
-                joint_3 = round(joint_pos_clipped[3] * self.factor)
-                joint_4 = round(joint_pos_clipped[4] * self.factor)
-                joint_5 = round(joint_pos_clipped[5] * self.factor)
-                
-                gripper_cmd = round(abs(self.gripper_pos) * 1000 * 1000)
-                
-                if self.debug_mode:
-                    print(f"[DEBUG] joint_0-5: {joint_0}, {joint_1}, {joint_2}, {joint_3}, {joint_4}, {joint_5}")
-                    print(f"[DEBUG] gripper_cmd: {gripper_cmd}")
-                
-                # 如果启用了位置限制，在发送指令前先检查
-                # 注意：由于 GetArmEndPoseMsgs() 返回的是当前位置，不是预测位置
-                # 我们暂时只使用关节限制和变化量限制来保证安全
-                # 位置限制的检查会在移动后进行，如果超出限制会回退到安全位置
-                use_safe_pos = False
-                # 暂时禁用基于 FK 的预测检查，因为需要更复杂的正向运动学计算
-                # if ENABLE_POSITION_LIMITS and self.safe_joint_pos is not None:
-                #     end_pose = self.piper.GetArmEndPoseMsgs()
-                #     ...
-                
-                # 如果需要使用安全位置
-                if use_safe_pos and self.safe_joint_pos is not None:
-                    joint_0 = round(self.safe_joint_pos[0] * self.factor)
-                    joint_1 = round(self.safe_joint_pos[1] * self.factor)
-                    joint_2 = round(self.safe_joint_pos[2] * self.factor)
-                    joint_3 = round(self.safe_joint_pos[3] * self.factor)
-                    joint_4 = round(self.safe_joint_pos[4] * self.factor)
-                    joint_5 = round(self.safe_joint_pos[5] * self.factor)
-                
-                # 确保机械臂处于 CAN 命令控制模式（不需要每次都 EnableArm）
-                # 只需要在初始化时 EnableArm 一次，之后只需要保持模式正确
-                self.piper.ModeCtrl(0x01, 0x01, spd, 0x00)
-                time.sleep(0.005)  # 短暂等待模式切换
-                
-                # 发送关节指令（带重试机制）
-                max_retries = 3
-                success = False
-                for attempt in range(max_retries):
-                    try:
-                        self.piper.JointCtrl(joint_0, joint_1, joint_2, joint_3, joint_4, joint_5)
-                        self.piper.GripperCtrl(gripper_cmd, 1000, 0x01, 0)
-                        success = True
-                        break
-                    except Exception as e:
-                        if attempt < max_retries - 1:
-                            if self.debug_mode:
-                                print(f"[CAN 重试] 第{attempt+1}次发送失败：{e}，重试中...")
-                            time.sleep(0.05)  # 增加重试间隔
-                        else:
-                            print(f"[CAN 错误] 关节指令发送失败：{e}")
-                            # 尝试恢复：重新使能机械臂
-                            try:
-                                print(f"[CAN 恢复] 尝试重新使能机械臂...")
-                                self.piper.EnableArm(7, 0x02)
-                                time.sleep(0.1)
-                                # 重试一次
-                                self.piper.JointCtrl(joint_0, joint_1, joint_2, joint_3, joint_4, joint_5)
-                                self.piper.GripperCtrl(gripper_cmd, 1000, 0x01, 0)
-                                success = True
-                                print(f"[CAN 恢复] 成功恢复通信")
-                            except Exception as e2:
-                                print(f"[CAN 错误] 恢复失败：{e2}")
-                                raise
-                
-                if not success:
-                    raise Exception("关节指令发送失败，无法恢复")
-                
-                # 等待移动完成
-                time.sleep(0.15)  # 增加等待时间，确保机械臂有足够时间移动
-                
-                # 更新最后有效的关节位置
-                # 只有在成功移动后才更新，如果是安全位置回退则不更新
-                if not use_safe_pos:
-                    self.last_valid_joint_pos = joint_pos_clipped.copy()
-                elif self.last_valid_joint_pos is None:
-                    # 如果是第一次移动且需要使用安全位置，初始化 last_valid_joint_pos
-                    self.last_valid_joint_pos = joint_pos_clipped.copy()
-                
-                # 获取机械臂状态用于调试（仅在 debug_mode 下）
-                if self.debug_mode:
-                    arm_status = self.piper.GetArmStatus()
-                    print(f"[DEBUG] Arm Status: {arm_status}")
-            except Exception as e:
-                print(f"设置关节位置错误：{e}")
-                import traceback
-                traceback.print_exc()
-        
-        # 更新当前关节位置为目标位置（假设机械臂会移动到目标位置）
-        # 注意：实际位置可能与目标位置有差异，但为了简化，我们假设机械臂能准确到达
-        self.current_joint_pos = joint_pos.copy()
-        
-        # 在模拟模式下，更新末端执行器位置
-        if self.use_sim:
-            self._update_end_effector_pos_sim()
-            
+    def _camera_to_robot(self, camera_pos):
+        if self.hand_eye_offset is not None:
+            offset_m = self.hand_eye_offset / 1000.0
+            robot_pos = camera_pos + offset_m
+            return robot_pos
+        return camera_pos
+    
     def get_end_effector_pos(self):
         if not self.use_sim and self.piper is not None:
             try:
                 end_pose = self.piper.GetArmEndPoseMsgs()
-                self.current_end_effector_pos = np.array([
+                self.current_end_pos = np.array([
                     end_pose.end_pose.X_axis / 1000.0,
                     end_pose.end_pose.Y_axis / 1000.0,
                     end_pose.end_pose.Z_axis / 1000.0
                 ])
             except Exception as e:
                 print(f"获取末端位置错误：{e}")
-        return self.current_end_effector_pos.copy()
-            
+        return self.current_end_pos.copy()
+    
+    def set_end_pose(self, end_pos, rpy=None, gripper_pos=None):
+        end_pos = np.array(end_pos)
+        
+        if rpy is not None:
+            self.current_end_rpy = np.array(rpy)
+        
+        if gripper_pos is not None:
+            self.gripper_pos = gripper_pos
+        
+        if not self.use_sim and self.piper is not None:
+            try:
+                factor = 1000
+                
+                X = round(end_pos[0] * 1000.0)
+                Y = round(end_pos[1] * 1000.0)
+                Z = round(end_pos[2] * 1000.0)
+                RX = round(self.current_end_rpy[0] * factor)
+                RY = round(self.current_end_rpy[1] * factor)
+                RZ = round(self.current_end_rpy[2] * factor)
+                
+                gripper_cmd = round(abs(self.gripper_pos) * 1000 * 1000)
+                
+                self.piper.MotionCtrl_2(0x01, 0x00, 100, 0x00)
+                self.piper.EndPoseCtrl(X, Y, Z, RX, RY, RZ)
+                self.piper.GripperCtrl(gripper_cmd, 1000, 0x01, 0)
+                
+                time.sleep(0.1)
+                
+            except Exception as e:
+                print(f"设置末端姿态错误：{e}")
+                import traceback
+                traceback.print_exc()
+        
+        self.current_end_pos = end_pos.copy()
+    
     def get_obj_pos(self):
         if self.use_sim:
             self.apriltag_visible = True
             return self.obj_pos.copy()
         
-        # 真实世界：尝试用 AprilTag 检测
         self.apriltag_visible = False
         if self.use_apriltag and self.apriltag_detector is not None and self.camera is not None:
             try:
@@ -481,84 +241,27 @@ class PiperRobot:
                         self.apriltag_visible = True
                         tag = detections[0]
                         tag_pos_camera = tag.pose_t.flatten()
-                        
-                        # 转换到机械臂坐标系
                         obj_pos = self._camera_to_robot(tag_pos_camera)
-                        
                         self.last_detected_obj_pos = obj_pos
                         return obj_pos
             
             except Exception as e:
-                print(f"⚠️  AprilTag 检测错误: {e}")
+                pass
         
-        # 如果检测失败，返回最后一次检测到的位置或默认位置
         if self.last_detected_obj_pos is not None:
             return self.last_detected_obj_pos.copy()
         
         return self.obj_pos.copy()
     
-    def _camera_to_robot(self, camera_pos):
-        """
-        将相机坐标系转换为机械臂坐标系
-        
-        优先级：
-        1. 简单手眼标定偏移量（推荐初学者）
-        2. 完整手眼标定矩阵
-        3. 简单坐标转换（默认）
-        """
-        if self.hand_eye_offset is not None:
-            # 使用简单手眼标定偏移量
-            # offset 是毫米，需要转换为米
-            offset_m = self.hand_eye_offset / 1000.0
-            
-            # 先尝试简单的转换，根据 easy_hand_eye_calibration.py 的 offset 计算方式
-            # robot_pos = tag_pos + offset
-            robot_pos = camera_pos + offset_m
-            
-            # 打印用于调试的原始值（仅在debug_mode时打印）
-            if self.debug_mode:
-                print(f"[DEBUG] camera_pos (tag_pos): {camera_pos}")
-                print(f"[DEBUG] offset_m: {offset_m}")
-                print(f"[DEBUG] robot_pos: {robot_pos}")
-            
-            return robot_pos
-        
-        if self.T_cam2robot is not None:
-            # 使用完整手眼标定结果
-            p_cam = np.ones(4)
-            p_cam[:3] = camera_pos
-            p_robot = self.T_cam2robot @ p_cam
-            return p_robot[:3]
-        
-        # 简单坐标转换（需要根据实际情况调整）
-        robot_pos = np.zeros(3)
-        
-        # 假设相机坐标系：
-        #   x: 相机右方
-        #   y: 相机下方
-        #   z: 相机前方
-        #
-        # 转换为机械臂坐标系（示例）
-        robot_pos[0] = camera_pos[0]
-        robot_pos[1] = camera_pos[2]
-        robot_pos[2] = -camera_pos[1]
-        
-        # 添加相机相对于机械臂底座的偏移（需要根据实际安装位置调整）
-        robot_pos[0] += 0.0
-        robot_pos[1] += 0.0
-        robot_pos[2] += 0.0
-        
-        return robot_pos
-        
     def set_obj_pos(self, obj_pos):
         self.obj_pos = np.array(obj_pos)
-        
+    
     def get_goal_pos(self):
         return self.goal_pos.copy()
-        
+    
     def set_goal_pos(self, goal_pos):
         self.goal_pos = np.array(goal_pos)
-        
+    
     def get_camera_image(self):
         if self.camera is not None:
             try:
@@ -567,7 +270,7 @@ class PiperRobot:
                     resized = cv2.resize(color_array_rgb, (self.camera_width, self.camera_height))
                     return resized
             except Exception as e:
-                print(f"获取相机图像错误：{e}")
+                pass
         
         if self.use_sim:
             return np.zeros((self.camera_height, self.camera_width, 3), dtype=np.uint8)
@@ -576,12 +279,6 @@ class PiperRobot:
             
     def reset(self):
         self.gripper_pos = 0
-        # 重置卡住检测和限制检测状态
-        self.last_joint_pos = None
-        self.stuck_counter = 0
-        self.safe_joint_pos = np.array(INITIAL_JOINT_POS).copy()
-        self.last_valid_joint_pos = None  # 重置为 None，让第一次移动不进行变化量检查
-        self.position_limit_violated = False
         
         if not hasattr(self, '_initial_obj_pos'):
             self._initial_obj_pos = self.obj_pos.copy()
@@ -591,56 +288,27 @@ class PiperRobot:
         self.goal_pos = self._initial_goal_pos.copy()
         
         if not self.use_sim and self.piper is not None:
-            # 使用配置的初始关节位置
-            # 第一次移动不进行变化量检查（last_valid_joint_pos 为 None）
-            self.set_joint_pos(INITIAL_JOINT_POS, gripper_pos=0, speed=30)
-            time.sleep(1.5)  # 增加等待时间，确保机械臂到达初始位置
-            # 移动完成后，设置 last_valid_joint_pos
-            self.last_valid_joint_pos = np.array(INITIAL_JOINT_POS).copy()
+            print("[Reset] 机械臂回到初始位置...")
+            initial_pos = np.array([0.12, 0.025, 0.114])
+            initial_rpy = np.array([-3.1416, 0.4189, 3.1416])
+            self.set_end_pose(initial_pos, initial_rpy, gripper_pos=0)
+            time.sleep(1.5)
+            print("[Reset] ✓ 机械臂已回到初始位置")
         else:
-            self.current_joint_pos = np.array(INITIAL_JOINT_POS).copy()
-            
-        if self.use_sim:
-            self._update_end_effector_pos_sim()
-            
-    def update_stuck_detection(self):
-        """更新卡住检测状态（仅在step中调用一次）"""
-        if self.last_joint_pos is None:
-            self.last_joint_pos = self.current_joint_pos.copy()
-            return False
-        
-        # 计算关节位置变化
-        joint_change = np.linalg.norm(self.current_joint_pos - self.last_joint_pos)
-        if joint_change < 0.0001:  # 关节位置几乎没有变化（阈值已放宽10倍）
-            self.stuck_counter += 1
-        else:
-            self.stuck_counter = 0
-        
-        self.last_joint_pos = self.current_joint_pos.copy()
-        
-        return self.stuck_counter >= self.stuck_threshold
-    
-    def is_stuck(self):
-        """检测机械臂是否卡住（只读，不修改状态）"""
-        return self.stuck_counter >= self.stuck_threshold
+            self.current_end_pos = np.array([0.12, 0.025, 0.114])
+            self.current_end_rpy = np.array([-3.1416, 0.4189, 3.1416])
             
     def step(self, action, dt=0.01):
         action = np.clip(action, -1.0, 1.0)
-        # 增加动作幅度：从 0.1 改为 0.3，让机械臂在 seed 阶段有更多探索
-        joint_delta = action[:6] * 0.3
-        new_joint_pos = self.current_joint_pos + joint_delta
-        # 把 action[6] 从 [-1,1] 映射到 [0,1]
-        new_gripper_pos = (action[6] + 1.0) / 2.0
-        self.set_joint_pos(new_joint_pos, new_gripper_pos)
         
-        # 更新卡住检测（每步只调用一次）
-        self.update_stuck_detection()
+        pos_delta = action[:3] * 0.02
+        new_end_pos = self.current_end_pos + pos_delta
         
-        if self.use_sim:
-            self._update_obj_position_sim(action)
-            
+        gripper_pos = (action[3] + 1.0) / 2.0
+        
+        self.set_end_pose(new_end_pos, gripper_pos=gripper_pos)
         time.sleep(dt)
-        
+    
     def close(self):
         if self.piper is not None:
             try:
