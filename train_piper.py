@@ -85,6 +85,44 @@ class Workspace:
         self._global_step = 0
         self._global_episode = 0
 
+    def _is_buffer_valid(self, buffer_path):
+        """检查buffer路径是否有效（存在且非空）"""
+        if not buffer_path.exists():
+            return False
+        # 检查目录下是否有数据文件（至少一个非空文件）
+        try:
+            files = list(buffer_path.glob('*.npz')) + list(buffer_path.glob('*.pt'))
+            return len(files) > 0
+        except:
+            return False
+
+    def _get_buffer_path(self):
+        """获取有效的buffer路径，优先级：当前目录 > Hydra目录"""
+        # 候选路径列表
+        candidate_paths = []
+        
+        # 1. 当前工作目录的buffer
+        current_buffer = self.work_dir / 'buffer'
+        candidate_paths.append(('当前工作目录', current_buffer))
+        
+        # 2. Hydra输出目录的buffer（支持单次运行和批量运行）
+        if hasattr(self.cfg.hydra, 'run') and hasattr(self.cfg.hydra.run, 'dir'):
+            hydra_run_buffer = Path(self.cfg.hydra.run.dir) / 'buffer'
+            candidate_paths.append(('Hydra运行目录', hydra_run_buffer))
+        if hasattr(self.cfg.hydra, 'sweep') and hasattr(self.cfg.hydra.sweep, 'dir'):
+            hydra_sweep_buffer = Path(self.cfg.hydra.sweep.dir) / 'buffer'
+            candidate_paths.append(('Hydra批量目录', hydra_sweep_buffer))
+        
+        # 遍历候选路径，找到第一个有效的
+        for desc, path in candidate_paths:
+            if self._is_buffer_valid(path):
+                print(f"✅ 找到有效buffer: [{desc}] {path}")
+                return path
+        
+        # 都没找到，使用当前目录新建buffer
+        print(f"⚠️  未找到有效buffer，将在当前目录新建: {current_buffer}")
+        return current_buffer
+
     def setup(self):
         self.logger = Logger(self.work_dir,
                              use_tb=self.cfg.use_tb,
@@ -134,16 +172,18 @@ class Workspace:
             frame_stack=self.cfg.frame_stack
         )
         
+        # 获取有效的buffer路径（核心修改）
+        buffer_path = self._get_buffer_path()
+        
         # 初始化回放缓冲区
         data_specs = (self.train_env.observation_spec(),
                       self.train_env.action_spec(),
                       specs.Array((1, ), np.float32, 'reward'),
                       specs.Array((1, ), np.float32, 'discount'))
 
-        self.replay_storage = ReplayBufferStorage(data_specs,
-                                                  self.work_dir / 'buffer')
+        self.replay_storage = ReplayBufferStorage(data_specs, buffer_path)
         self.replay_loader, self.buffer = make_replay_loader(
-            self.work_dir / 'buffer', self.cfg.replay_buffer_size,
+            buffer_path, self.cfg.replay_buffer_size,
             self.cfg.batch_size,
             self.cfg.replay_buffer_num_workers, self.cfg.save_snapshot,
             math.floor(self._nstep + self._nstep_alpha),
