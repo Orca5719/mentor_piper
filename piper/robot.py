@@ -37,11 +37,15 @@ class PiperRobot:
         self.tag_size = tag_size
         
         self.piper = None
-        self.gripper_pos = 0
+        # 【关键修改】夹爪初始状态：张开（对齐 manual_collect.py）
+        self.gripper_pos = 0.08  # 0.08m = 张开，0.0m = 闭合
+        
         self.apriltag_visible = False
         
-        self.current_end_pos = np.array([0.3, 0.0, 0.2])
-        self.current_end_rpy = np.array([-3.1416, 0.4189, 3.1416])
+        # 【关键修改】机械臂初始位姿：完全复制 manual_collect.py
+        self.factor = 1000
+        self.current_end_pos = np.array([300.614 / 1000.0, -12.185 / 1000.0, 282.341 / 1000.0])  # mm → m
+        self.current_end_rpy = np.array([-179.351 * np.pi / 180.0, 23.933 * np.pi / 180.0, 177.934 * np.pi / 180.0])  # 度 → 弧度
         
         if not use_sim and PiperSDK is not None:
             try:
@@ -51,12 +55,21 @@ class PiperRobot:
                 while not self.piper.EnablePiper():
                     time.sleep(0.01)
                 
-                self.piper.GripperCtrl(0, 1000, 0x01, 0)
+                # 【关键修改】初始化夹爪为张开
+                self.piper.GripperCtrl(round(0.08 * 1000 * 1000), 1000, 0x01, 0)
                 
+                # 【关键修改】初始化机械臂到 manual_collect.py 初始位姿
                 self.piper.MotionCtrl_2(0x01, 0x00, 100, 0x00)
+                X = round(300.614 * self.factor)
+                Y = round(-12.185 * self.factor)
+                Z = round(282.341 * self.factor)
+                RX = round(-179.351 * self.factor)
+                RY = round(23.933 * self.factor)
+                RZ = round(177.934 * self.factor)
+                self.piper.EndPoseCtrl(X, Y, Z, RX, RY, RZ)
                 time.sleep(0.1)
                 
-                print("✓ 机械臂连接成功")
+                print("✓ 机械臂连接成功（初始位姿已对齐 manual_collect.py）")
             except Exception as e:
                 print(f"警告：无法连接机械臂：{e}，将使用模拟模式")
                 self.use_sim = True
@@ -202,6 +215,7 @@ class PiperRobot:
                 RY = round(self.current_end_rpy[1] * factor)
                 RZ = round(self.current_end_rpy[2] * factor)
                 
+                # 【关键修改】夹爪控制：对齐 manual_collect.py 的数值范围
                 gripper_cmd = round(abs(self.gripper_pos) * 1000 * 1000)
                 
                 self.piper.MotionCtrl_2(0x01, 0x00, 100, 0x00)
@@ -277,7 +291,9 @@ class PiperRobot:
             return np.zeros((self.camera_height, self.camera_width, 3), dtype=np.uint8)
             
     def reset(self):
-        self.gripper_pos = 0
+        """【关键修改】重置函数：完全对齐 manual_collect.py 的初始状态"""
+        # 重置夹爪为张开
+        self.gripper_pos = 0.08  # 0.08m = 张开
         
         if not hasattr(self, '_initial_obj_pos'):
             self._initial_obj_pos = self.obj_pos.copy()
@@ -287,15 +303,18 @@ class PiperRobot:
         self.goal_pos = self._initial_goal_pos.copy()
         
         if not self.use_sim and self.piper is not None:
-            print("[Reset] 机械臂回到初始位置...")
-            initial_pos = np.array([0.12, 0.025, 0.114])
-            initial_rpy = np.array([-3.1416, 0.4189, 3.1416])
-            self.set_end_pose(initial_pos, initial_rpy, gripper_pos=0)
+            print("[Reset] 机械臂回到 manual_collect.py 初始位置...")
+            # 【关键修改】使用 manual_collect.py 的初始位姿
+            initial_pos = np.array([300.614 / 1000.0, -12.185 / 1000.0, 282.341 / 1000.0])
+            initial_rpy = np.array([-179.351 * np.pi / 180.0, 23.933 * np.pi / 180.0, 177.934 * np.pi / 180.0])
+            self.set_end_pose(initial_pos, initial_rpy, gripper_pos=0.08)  # 夹爪张开
             time.sleep(1.5)
-            print("[Reset] ✓ 机械臂已回到初始位置")
+            print("[Reset] ✓ 机械臂已回到 manual_collect.py 初始位置（夹爪张开）")
         else:
-            self.current_end_pos = np.array([0.12, 0.025, 0.114])
-            self.current_end_rpy = np.array([-3.1416, 0.4189, 3.1416])
+            # 模拟模式下也对齐初始位姿
+            self.current_end_pos = np.array([300.614 / 1000.0, -12.185 / 1000.0, 282.341 / 1000.0])
+            self.current_end_rpy = np.array([-179.351 * np.pi / 180.0, 23.933 * np.pi / 180.0, 177.934 * np.pi / 180.0])
+            self.gripper_pos = 0.08
             
     def step(self, action, dt=0.01):
         action = np.clip(action, -1.0, 1.0)
@@ -303,7 +322,8 @@ class PiperRobot:
         pos_delta = action[:3] * 0.02
         new_end_pos = self.current_end_pos + pos_delta
         
-        gripper_pos = (action[3] + 1.0) / 2.0
+        # 夹爪动作：对齐 manual_collect.py 的归一化逻辑
+        gripper_pos = (action[3] + 1.0) / 2.0 * 0.08  # [-1,1] → [0, 0.08]
         
         self.set_end_pose(new_end_pos, gripper_pos=gripper_pos)
         time.sleep(dt)

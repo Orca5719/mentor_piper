@@ -1,284 +1,310 @@
-import warnings
-warnings.filterwarnings('ignore', category=DeprecationWarning)
-import os
-os.environ['MKL_SERVICE_FORCE_INTEL'] = '1'
-from pathlib import Path
 import numpy as np
-import torch
-from dm_env import specs
-from tqdm import tqdm
+import time
+import cv2
+import json
+import os
+from collections import deque
 import sys
-from contextlib import contextmanager
+import threading
+from queue import Queue
 
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), 'piper'))
+class SimpleSpacemouseCollect:
+    def __init__(self):
+        print("="*60)
+        print("     Piper 3D鼠标数据收集工具 (适配256x256×9输入)")
+        print("="*60)
+        print()
+        
+        sys.path.insert(0, os.path.join(os.path.dirname(__file__), 'piper'))
+        
+        # 硬件对象
+        self.robot_cam = None
+        self.piper_arm = None
+        
+        # 控制状态
+        self._running = True
+        self._reward = 0.0
+        self._lock = threading.Lock()  # 线程安全锁
+        
+        # 配置参数
+        self.IMG_HEIGHT = 256
+        self.IMG_WIDTH = 256
+        self.factor = 1000  # 和参考代码对齐
+        self.control_sleep = 0.01  # 控制循环sleep（参考原代码）
+        
+        # 机械臂初始位姿（完全复用参考代码）
+        self.X = round(300.614 * self.factor)
+        self.Y = round(-12.185 * self.factor)
+        self.Z = round(282.341 * self.factor)
+        self.RX = round(-179.351 * self.factor)
+        self.RY = round(23.933 * self.factor)
+        self.RZ = round(177.934 * self.factor)
+        self.joint_6 = round(0.08 * 1000 * 1000)
+        
+        # 数据收集相关
+        self.data_queue = Queue(maxsize=1000)  # 非阻塞数据队列
+        self.frames_queue = deque(maxlen=3)    # 帧缓存队列
+        self.episode = 0
+        self.episode_step = 0
+        self.episode_reward = 0
+        self.data_buffer = []
 
-torch.backends.cudnn.benchmark = True
+    def init_hardware(self):
+        """硬件初始化（和参考代码对齐，简化逻辑）"""
+        from piper.robot import PiperRobot
+        from piper_sdk import C_PiperInterface_V2
+        
+        print("正在初始化相机...")
+        self.robot_cam = PiperRobot(
+            use_sim=False,
+            camera_width=self.IMG_WIDTH,
+            camera_height=self.IMG_HEIGHT,
+            use_apriltag=True,
+            tag_size=0.05
+        )
+        print("✓ 相机初始化成功")
+        
+        print("正在初始化机械臂...")
+        self.piper_arm = C_PiperInterface_V2("can0")
+        self.piper_arm.ConnectPort()
+        while not self.piper_arm.EnablePiper():
+            time.sleep(0.01)
+        # 初始位姿设置（参考原代码）
+        self.piper_arm.MotionCtrl_2(0x01, 0x00, 100, 0x00)
+        self.piper_arm.EndPoseCtrl(self.X, self.Y, self.Z, self.RX, self.RY, self.RZ)
+        self.piper_arm.GripperCtrl(abs(self.joint_6), 1000, 0x01, 0)
+        print("✓ 机械臂初始化成功")
+        print("✓ 硬件初始化完成")
+        print()
 
-# 补充缺失的 utils 模块核心函数
-class utils:
-    @staticmethod
-    @contextmanager
-    def eval_mode(agent):
-        """临时将agent设为eval模式，退出后恢复train模式"""
-        old_mode = agent.training
-        agent.eval()
+    def _image_capture_thread(self):
+        """独立线程获取相机图像，避免阻塞控制循环"""
+        while self._running:
+            try:
+                # 获取图像并resize（非阻塞方式）
+                frame = self.robot_cam.get_camera_image()
+                frame = cv2.resize(frame, (self.IMG_WIDTH, self.IMG_HEIGHT), interpolation=cv2.INTER_AREA)
+                with self._lock:
+                    self.frames_queue.append(frame)
+                time.sleep(0.005)  # 图像采集频率略高于控制频率
+            except Exception as e:
+                print(f"图像采集线程异常: {e}")
+                continue
+
+    def get_stacked_obs(self):
+        """优化版：快速生成9通道堆叠观测"""
+        with self._lock:
+            frames = list(self.frames_queue)
+        
+        # 补全3帧
+        while len(frames) < 3:
+            frames.append(frames[0] if frames else np.zeros((self.IMG_HEIGHT, self.IMG_WIDTH, 3), dtype=np.uint8))
+        
+        # 堆叠并转置（简化计算）
+        stacked = np.concatenate(frames, axis=-1)
+        stacked = np.transpose(stacked, (2, 0, 1))
+        return stacked
+
+    def _process_data_thread(self):
+        """独立线程处理数据缓存，不影响控制循环"""
+        while self._running:
+            if not self.data_queue.empty():
+                try:
+                    # 从队列取出数据并缓存
+                    data = self.data_queue.get()
+                    self.data_buffer.append(data)
+                except Exception as e:
+                    print(f"数据处理线程异常: {e}")
+            time.sleep(0.01)
+
+    def collect(self, num_episodes=5, max_steps=200):
+        print("="*60)
+        print("控制说明:")
+        print("  3D鼠标移动: 控制机械臂 X/Y/Z 方向")
+        print("  3D鼠标按钮0: 夹爪打开")
+        print("  3D鼠标按钮1: 夹爪关闭")
+        print("  键盘空格: +10 奖励")
+        print("  键盘q: 退出（会保存已收集数据）")
+        print("="*60)
+        print(f"📌 本次将收集 {num_episodes} 轮数据，收集完成后统一保存！")
+        print()
+        
+        # 初始化硬件
+        self.init_hardware()
+        
+        # 启动辅助线程（图像采集+数据处理）
+        img_thread = threading.Thread(target=self._image_capture_thread, daemon=True)
+        data_thread = threading.Thread(target=self._process_data_thread, daemon=True)
+        img_thread.start()
+        data_thread.start()
+        
+        # 预填充帧队列
+        time.sleep(0.5)
+        while len(self.frames_queue) < 3:
+            time.sleep(0.01)
+        
+        print(f"开始收集数据 (目标 {num_episodes} 个 episode)...")
+        print(f"输出格式: 观测={self.IMG_HEIGHT}x{self.IMG_WIDTH}×9通道 | 动作=4维 | 奖励=标量")
+        print()
+
         try:
-            yield
+            import pyspacemouse
+            with pyspacemouse.open() as device:
+                # 核心控制循环（参考piper_spacemouse.py的简洁逻辑）
+                while self.episode < num_episodes and self._running:
+                    # 1. 快速读取3D鼠标状态（优先操作）
+                    state = device.read()
+                    
+                    # 2. 机械臂位姿更新（和参考代码完全对齐）
+                    state_X = round(state.x * self.factor)
+                    state_Y = round(state.y * self.factor)
+                    state_Z = round(state.z * self.factor)
+                    
+                    self.X = round(self.X + state_X)
+                    self.Y = round(self.Y + state_Y)
+                    self.Z = round(self.Z + state_Z)
+                    self.RX = round(self.RX)
+                    self.RY = round(self.RY)
+                    self.RZ = round(self.RZ)
+                    
+                    # 3. 发送机械臂控制指令（无延迟）
+                    self.piper_arm.MotionCtrl_2(0x01, 0x00, 100, 0x00)
+                    self.piper_arm.EndPoseCtrl(self.X, self.Y, self.Z, self.RX, self.RY, self.RZ)
+                    
+                    # 4. 夹爪控制（参考代码逻辑）
+                    if state.buttons[0]:
+                        self.joint_6 = round(0.08 * 1000 * 1000)
+                    elif state.buttons[1]:
+                        self.joint_6 = round(0.00 * 1000 * 1000)
+                    self.piper_arm.GripperCtrl(abs(self.joint_6), 1000, 0x01, 0)
+                    
+                    # 5. 键盘处理（仅保留退出和奖励）
+                    cv2_key = cv2.waitKey(1) & 0xFF
+                    if cv2_key == ord(' '):
+                        self._reward += 10.0
+                        print(f"[奖励] +10.0")
+                    elif cv2_key == ord('q') or cv2_key == ord('Q'):
+                        print("\n用户主动退出，开始保存已收集数据...")
+                        self._running = False
+                        break
+                    
+                    # 6. 数据收集（非阻塞方式放入队列）
+                    if self.episode_step > 0 and len(self.frames_queue) >= 3:
+                        try:
+                            # 快速生成观测（不阻塞控制循环）
+                            obs_prev = self.get_stacked_obs()
+                            # 构建动作向量
+                            action = np.array([
+                                np.clip(state.x * 2.0, -1.0, 1.0),
+                                np.clip(state.y * 2.0, -1.0, 1.0),
+                                np.clip(state.z * 2.0, -1.0, 1.0),
+                                np.clip((self.joint_6 / (1000 * 1000) - 0.04) * 50.0, -1.0, 1.0)
+                            ], dtype=np.float32)
+                            # 奖励处理
+                            reward = self._reward
+                            self._reward = 0.0
+                            # 放入队列（非阻塞）
+                            if not self.data_queue.full():
+                                self.data_queue.put({
+                                    'observation': obs_prev,
+                                    'action': action,
+                                    'reward': reward,
+                                    'next_observation': self.get_stacked_obs(),
+                                    'discount': 1.0
+                                })
+                        except Exception as e:
+                            print(f"数据收集临时异常: {e}")
+                    
+                    # 7. Episode管理（简化逻辑）
+                    self.episode_reward += self._reward
+                    self.episode_step += 1
+                    
+                    if self.episode_step >= max_steps:
+                        print(f"\n[Episode {self.episode + 1}/{num_episodes}] 完成，奖励: {self.episode_reward:.1f}")
+                        # 机械臂回到初始位姿（快速重置）
+                        self.X = round(300.614 * self.factor)
+                        self.Y = round(-12.185 * self.factor)
+                        self.Z = round(282.341 * self.factor)
+                        self.piper_arm.EndPoseCtrl(self.X, self.Y, self.Z, self.RX, self.RY, self.RZ)
+                        time.sleep(0.5)  # 缩短等待时间
+                        
+                        # 重置计数
+                        self.episode += 1
+                        self.episode_step = 0
+                        self.episode_reward = 0
+                    
+                    # 核心：控制循环sleep（和参考代码一致）
+                    time.sleep(self.control_sleep)
+
+        except ImportError:
+            print("✗ pyspacemouse 未安装，请先安装: pip install pyspacemouse")
+        except KeyboardInterrupt:
+            print("\n用户中断，开始保存已收集数据...")
         finally:
-            agent.train(old_mode)
+            # 停止线程
+            self._running = False
+            time.sleep(0.5)
+            # 清理资源
+            cv2.destroyAllWindows()
+            if self.piper_arm is not None:
+                self.piper_arm.EmergencyStop()
+                self.piper_arm.DisconnectPort()
+            if self.robot_cam is not None:
+                self.robot_cam.close()
+        
+        # 收集完成/退出后 统一保存所有数据
+        print(f"\n📊 数据收集结束！共收集 {len(self.data_buffer)} 条有效数据")
+        if len(self.data_buffer) > 0:
+            self.save_data()
+        else:
+            print("⚠️  无有效数据可保存")
 
-# 适配256×256×9输入的Actor网络
-class Actor(torch.nn.Module):
-    def __init__(self, obs_shape, action_shape):
-        super().__init__()
-        # 卷积网络（适配9通道、256×256输入）
-        self.conv_layers = torch.nn.Sequential(
-            torch.nn.Conv2d(9, 32, kernel_size=8, stride=4),  # (32, 62, 62)
-            torch.nn.ReLU(),
-            torch.nn.Conv2d(32, 64, kernel_size=4, stride=2),  # (64, 29, 29)
-            torch.nn.ReLU(),
-            torch.nn.Conv2d(64, 64, kernel_size=3, stride=1),  # (64, 27, 27)
-            torch.nn.ReLU(),
-            torch.nn.Flatten(),
-        )
-        
-        # 动态计算卷积输出维度（适配256×256输入）
-        with torch.no_grad():
-            dummy = torch.randn(1, *obs_shape)
-            conv_out = self.conv_layers(dummy).shape[1]
-            print(f"卷积层输出维度: {conv_out} (256×256×9 → {conv_out})")
-        
-        self.fc_layers = torch.nn.Sequential(
-            torch.nn.Linear(conv_out, 512),
-            torch.nn.ReLU(),
-            torch.nn.Linear(512, action_shape[0])
-        )
-    
-    def forward(self, x):
-        # 归一化输入（uint8→[0,1]）
-        x = x.float() / 255.0
-        conv_out = self.conv_layers(x)
-        mean = self.fc_layers(conv_out)
-        # 返回简单的分布（仅均值，适配训练代码的dist.mean）
-        return type('obj', (object,), {'mean': mean})
-
-class Agent:
-    def __init__(self, obs_shape, action_shape):
-        self.actor = Actor(obs_shape, action_shape)
-        self.training = True  # 适配eval_mode
-    
-    def train(self, mode=True):
-        self.training = mode
-        self.actor.train(mode)
-
-def make_agent(obs_spec, action_spec, cfg):
-    """适配训练代码的agent创建函数"""
-    cfg.obs_shape = obs_spec.shape
-    cfg.action_shape = action_spec.shape
-    return Agent(obs_spec.shape, action_spec.shape)
-
-
-class ManualDataTrainer:
-    def __init__(self, data_file="spacemouse_data_256x256x9.npz"):  # 默认文件名对齐数据收集代码
-        print("="*60)
-        print("      手动数据预训练工具 (适配256×256×9输入)")
-        print("="*60)
-        print()
-        
-        self.data_file = data_file
-        self.work_dir = Path.cwd()
-        
-        # 简化配置（无需yaml文件）
-        print("⚠️  使用内置简化配置（无需yaml文件）")
-        self.cfg = type('obj', (object,), {
-            'device': 'cuda' if torch.cuda.is_available() else 'cpu',
-            'agent': type('obj', (object,), {})
-        })
-        
-        self.device = torch.device(self.cfg.device)
-        print(f"设备: {self.device}")
-        print()
-        
-        self.agent = None
-        self.data = None
-    
-    def load_data(self):
-        print(f"正在加载数据: {self.data_file}")
-        
-        if not os.path.exists(self.data_file):
-            print(f"✗ 数据文件不存在: {self.data_file}")
-            return False
-        
+    def save_data(self, filename="spacemouse_data_256x256x9.npz"):
+        """批量保存数据（优化版）"""
         try:
-            self.data = np.load(self.data_file)
-            print(f"✓ 数据加载成功")
-            print(f"  观测数据: {self.data['observations'].shape} (预期: [N, 9, 256, 256])")
-            print(f"  动作数据: {self.data['actions'].shape} (预期: [N, 4])")
-            print(f"  奖励数据: {self.data['rewards'].shape}")
-            print(f"  数据总量: {len(self.data['rewards'])} transitions")
-            print()
-            return True
+            # 批量转换为numpy数组（减少循环次数）
+            observations = np.stack([d['observation'] for d in self.data_buffer])
+            actions = np.stack([d['action'] for d in self.data_buffer])
+            rewards = np.array([d['reward'] for d in self.data_buffer])
+            next_observations = np.stack([d['next_observation'] for d in self.data_buffer])
+            discounts = np.array([d['discount'] for d in self.data_buffer])
+            
+            print(f"\n📋 数据形状验证:")
+            print(f"  observations: {observations.shape} (预期: [N, 9, 256, 256])")
+            print(f"  actions: {actions.shape} (预期: [N, 4])")
+            print(f"  rewards: {rewards.shape} (预期: [N])")
+            
+            # 压缩保存
+            np.savez_compressed(filename,
+                               observations=observations,
+                               actions=actions,
+                               rewards=rewards,
+                               next_observations=next_observations,
+                               discounts=discounts)
+            print(f"\n✅ 数据已统一保存到: {os.path.abspath(filename)}")
+            print(f"  总数据量: {len(self.data_buffer)} transitions")
+            
+            # 保存后清空缓冲区
+            self.data_buffer = []
         except Exception as e:
-            print(f"✗ 数据加载失败: {e}")
+            print(f"\n❌ 数据保存失败: {e}")
             import traceback
             traceback.print_exc()
-            return False
-    
-    def init_mentor_agent(self):
-        print("正在初始化 Mentor Agent...")
-        
-        # 核心修改：观测规格改为256×256×9
-        obs_spec = specs.BoundedArray(
-            (9, 256, 256),  # 适配256×256×9输入
-            np.uint8,
-            0,
-            255,
-            name='observation'
-        )
-        
-        action_spec = specs.BoundedArray(
-            (4,),
-            np.float32,
-            -1.0,
-            1.0,
-            'action'
-        )
-        
-        self.agent = make_agent(obs_spec, action_spec, self.cfg.agent)
-        # 将agent移到设备
-        self.agent.actor.to(self.device)
-        print("✓ Mentor Agent 初始化成功")
-        print(f"  Actor网络结构: {self.agent.actor}")
-        print()
-    
-    def train_with_behavior_cloning(self, num_epochs=100, batch_size=32):
-        if self.data is None:
-            print("✗ 没有数据可训练")
-            return
-        
-        if self.agent is None:
-            self.init_mentor_agent()
-        
-        print("="*60)
-        print("开始行为克隆预训练 (256×256×9输入)")
-        print("="*60)
-        print()
-        
-        observations = self.data['observations']
-        actions = self.data['actions']
-        
-        num_samples = len(observations)
-        # 处理最后一批不足batch_size的情况
-        num_batches = max(1, num_samples // batch_size)
-        
-        print(f"训练参数:")
-        print(f"  Epochs: {num_epochs}")
-        print(f"  Batch size: {batch_size}")
-        print(f"  Samples per epoch: {num_samples}")
-        print(f"  Batches per epoch: {num_batches}")
-        print()
-        
-        best_loss = float('inf')
-        
-        optimizer = torch.optim.Adam(self.agent.actor.parameters(), lr=1e-4)
-        
-        for epoch in range(num_epochs):
-            indices = np.random.permutation(num_samples)
-            
-            epoch_loss = 0.0
-            
-            pbar = tqdm(range(num_batches), desc=f'Epoch {epoch + 1}/{num_epochs}')
-            
-            for batch_idx in pbar:
-                start_idx = batch_idx * batch_size
-                end_idx = min(start_idx + batch_size, num_samples)  # 避免越界
-                if start_idx >= end_idx:
-                    break
-                
-                batch_indices = indices[start_idx:end_idx]
-                
-                # 加载批次数据（uint8→保持原样，在模型内归一化）
-                obs_batch = torch.tensor(observations[batch_indices], dtype=torch.uint8).to(self.device)
-                act_batch = torch.tensor(actions[batch_indices], dtype=torch.float32).to(self.device)
-                
-                with utils.eval_mode(self.agent):
-                    dist = self.agent.actor(obs_batch)
-                    pred_actions = dist.mean
-                
-                # MSE损失（行为克隆核心）
-                loss = torch.mean((pred_actions - act_batch) ** 2)
-                
-                optimizer.zero_grad()
-                loss.backward()
-                optimizer.step()
-                
-                epoch_loss += loss.item() * (end_idx - start_idx)  # 加权求和
-                pbar.set_postfix({'loss': f'{loss.item():.4f}'})
-            
-            avg_loss = epoch_loss / num_samples  # 按样本数平均
-            print(f'Epoch {epoch + 1} 完成, 平均 Loss: {avg_loss:.6f}')
-            
-            # 保存最佳模型
-            if avg_loss < best_loss:
-                best_loss = avg_loss
-                self.save_snapshot('pretrained_snapshot_256x256x9.pt', best_loss=best_loss)
-                print(f'✓ 保存最佳预训练模型 (Loss: {best_loss:.6f})')
-            
-            # 定期保存
-            if (epoch + 1) % 20 == 0:
-                self.save_snapshot(f'pretrained_epoch_{epoch + 1}_256x256x9.pt', best_loss=best_loss)
-        
-        print()
-        print("="*60)
-        print("预训练完成！")
-        print(f"最佳 Loss: {best_loss:.6f}")
-        print()
-        print("使用方法:")
-        print("  1. 将 pretrained_snapshot_256x256x9.pt 复制到工作目录")
-        print("  2. 在 config.yaml 中设置:")
-        print("     snapshot_path: 'pretrained_snapshot_256x256x9.pt'")
-        print("  3. 运行: python train_piper.py")
-        print("="*60)
-    
-    def save_snapshot(self, filename='pretrained_snapshot_256x256x9.pt', best_loss=None):
-        save_path = self.work_dir / filename
-        
-        # 保存模型权重（仅保存必要部分，避免冗余）
-        payload = {
-            'agent': self.agent,
-            'actor_state_dict': self.agent.actor.state_dict(),
-            'optimizer_state_dict': torch.optim.Adam(self.agent.actor.parameters()).state_dict(),
-            'best_loss': best_loss if best_loss is not None else float('inf'),
-            '_global_step': 0,
-            '_global_episode': 0,
-            'input_shape': (9, 256, 256)  # 保存输入形状信息
-        }
-        
-        torch.save(payload, save_path)
-        print(f'✓ 预训练模型已保存到: {save_path}')
 
 
 def main():
-    print("\n请选择数据文件:")
-    data_file = input("数据文件路径 (默认 spacemouse_data_256x256x9.npz): ").strip() or "spacemouse_data_256x256x9.npz"
+    collector = SimpleSpacemouseCollect()
     
-    trainer = ManualDataTrainer(data_file=data_file)
-    
-    if not trainer.load_data():
-        print("\n请先运行 manual_collect.py 收集数据！")
-        return
-    
-    print("\n请选择训练模式:")
-    print("1. 行为克隆预训练（推荐）")
+    print("\n请选择:")
+    print("1. 开始收集数据")
     print("2. 退出")
     
     choice = input("\n请输入选项 (1-2): ").strip()
     
     if choice == '1':
-        num_epochs = int(input("训练多少个 epoch? (默认 100): ") or "100")
-        batch_size = int(input("Batch size? (默认 32): ") or "32")
-        
-        trainer.train_with_behavior_cloning(num_epochs=num_epochs, batch_size=batch_size)
+        num_episodes = int(input("收集多少个 episode? (默认 5): ") or "5")
+        max_steps = int(input("每个 episode 多少步? (默认 200): ") or "200")
+        collector.collect(num_episodes=num_episodes, max_steps=max_steps)
     else:
         print("退出")
 

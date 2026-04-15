@@ -245,7 +245,8 @@ class PiperEnv:
         return reward, success, obj_to_target
     
     def reset(self):
-        self.robot.reset()
+        """【关键修改】环境重置：调用 robot.reset()，确保与 manual_collect.py 一致"""
+        self.robot.reset()  # 机器人重置（夹爪张开+位姿初始）
         self.step_count = 0
         self._episode_reward = 0.0
         self._manual_reward = 0.0
@@ -362,14 +363,13 @@ class PiperWrapper:
                                  reward=0.0,
                                  discount=1.0,
                                 success=time_step['success'])
-    
+
     def step(self, action):
         action = {'action': action}
         time_step = self._env.step(action)
         obs = time_step['image']
         self.stackedobs = np.roll(self.stackedobs, shift=-obs.shape[-1], axis=-1)
         self.stackedobs[..., -obs.shape[-1]:] = obs
-
         if time_step['is_first']:
             step_type = StepType.FIRST
         elif time_step['is_last']:
@@ -382,17 +382,17 @@ class PiperWrapper:
                                  reward=time_step['reward'],
                                  discount=1.0,
                                 success=time_step['success'])
-    
+
     @property
     def act_space(self):
         return self._env.act_space
-    
+
     @property
     def obs_space(self):
         os = dict(self._env.obs_space)
         os["image"] = self.observation_space
         return os
-    
+
     def close(self):
         self._env.close()
 

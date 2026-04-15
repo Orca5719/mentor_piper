@@ -3,10 +3,9 @@ import warnings
 warnings.filterwarnings('ignore', category=DeprecationWarning)
 
 import os
+from pathlib import Path
 
 os.environ['MKL_SERVICE_FORCE_INTEL'] = '1'
-
-from pathlib import Path
 
 import hydra
 import numpy as np
@@ -33,7 +32,10 @@ torch.backends.cudnn.benchmark = True
 def make_agent(obs_spec, action_spec, cfg):
     cfg.obs_shape = obs_spec.shape
     cfg.action_shape = action_spec.shape
-    return hydra.utils.instantiate(cfg)
+    agent = hydra.utils.instantiate(cfg)
+    # 确保Agent初始化后移到指定设备
+    agent = agent.to(cfg.device)
+    return agent
 
 
 class Workspace:
@@ -44,6 +46,9 @@ class Workspace:
         print(f'\n工作目录: {self.work_dir}')
         print("#"*50)
         self.last_save_step = -9999
+        
+        # 初始化WandB（提前初始化，确保加载快照后能同步步数）
+        self.wandb_init = False
         if self.cfg.use_wandb:
             exp_name = '_'.join([cfg.task_name, str(cfg.seed)])
             group_name = re.search(r'\.(.+)\.', cfg.agent._target_).group(1)
@@ -58,6 +63,8 @@ class Workspace:
                        group=name_2,
                        name=name_3,
                        config=cfg)
+            self.wandb_init = True
+        
         utils.set_seed_everywhere(cfg.seed)
         self.device = torch.device(cfg.device)
         self._discount = cfg.discount
@@ -68,9 +75,12 @@ class Workspace:
         self._nstep = cfg.nstep
         self._nstep_alpha = cfg.nstep_alpha
         self._nstep_alpha_temp = cfg.nstep_alpha_temp
+        
+        # 先初始化环境，再初始化Agent
         self.setup()
         self.agent = make_agent(self.train_env.observation_spec(),
                                 self.train_env.action_spec(), self.cfg.agent)
+        
         self.timer = utils.Timer()
         self._global_step = 0
         self._global_episode = 0
@@ -80,6 +90,7 @@ class Workspace:
                              use_tb=self.cfg.use_tb,
                              use_wandb=self.cfg.use_wandb)
         
+        # 读取环境配置（增加容错）
         use_sim = getattr(self.cfg, 'use_sim', True)
         visualize = getattr(self.cfg, 'visualize', False)
         obj_pos = getattr(self.cfg, 'obj_pos', None)
@@ -89,6 +100,7 @@ class Workspace:
         camera_calibration_file = getattr(self.cfg, 'camera_calibration_file', 'camera_calibration.npz')
         hand_eye_calibration_file = getattr(self.cfg, 'hand_eye_calibration_file', 'simple_hand_eye.json')
         
+        # 初始化训练环境
         self.train_env = piper_env.make(
             self.cfg.task_name, 
             self.cfg.seed,
@@ -104,6 +116,8 @@ class Workspace:
             hand_eye_calibration_file=hand_eye_calibration_file,
             frame_stack=self.cfg.frame_stack
         )
+        
+        # 初始化评估环境
         self.eval_env = piper_env.make(
             self.cfg.task_name, 
             self.cfg.seed,
@@ -120,6 +134,7 @@ class Workspace:
             frame_stack=self.cfg.frame_stack
         )
         
+        # 初始化回放缓冲区
         data_specs = (self.train_env.observation_spec(),
                       self.train_env.action_spec(),
                       specs.Array((1, ), np.float32, 'reward'),
@@ -169,10 +184,16 @@ class Workspace:
                           math.exp(-self.global_step / self._nstep_alpha_temp))
 
     def update_buffer(self):
-        self.buffer.update_nstep(self.nstep)
+        """更新回放缓冲区的nstep参数（动态调整）"""
+        current_nstep = self.nstep
+        self.buffer.update_nstep(current_nstep)
+        # 可选：打印nstep更新日志（便于调试）
+        if self.global_step % 1000 == 0:
+            self.logger.log('nstep', current_nstep, self.global_frame)
         return
     
     def eval(self):
+        """评估函数（优化进度条和容错）"""
         step, episode, total_reward, total_sr = 0, 0, 0, 0
         eval_until_episode = utils.Until(self.cfg.num_eval_episodes)
 
@@ -181,13 +202,15 @@ class Workspace:
             episode_sr = False
             time_step = self.eval_env.reset()
             self.video_recorder.init(self.eval_env, enabled=(episode == 0))
+            
             while not time_step.last():
                 with torch.no_grad(), utils.eval_mode(self.agent):
                     action = self.agent.act(time_step.observation,
                                             self.global_step,
                                             eval_mode=True)
                 time_step = self.eval_env.step(action)
-                episode_sr = episode_sr or time_step.success
+                # 容错处理：避免success属性不存在
+                episode_sr = episode_sr or getattr(time_step, 'success', False)
                 self.video_recorder.record(self.eval_env)
                 total_reward += time_step.reward
                 step += 1
@@ -198,16 +221,22 @@ class Workspace:
             self.video_recorder.save(f'{self.global_frame}.mp4')
         pbar.close()
         
+        # 记录评估日志
+        avg_sr = total_sr / episode if episode > 0 else 0.0
+        avg_reward = total_reward / episode if episode > 0 else 0.0
+        avg_length = step * self.cfg.action_repeat / episode if episode > 0 else 0.0
+        
         with self.logger.log_and_dump_ctx(self.global_frame, ty='eval') as log:
-            log('episode_success_rate', total_sr / episode)
-            log('episode_reward', total_reward / episode)
-            log('episode_length', step * self.cfg.action_repeat / episode)
+            log('episode_success_rate', avg_sr)
+            log('episode_reward', avg_reward)
+            log('episode_length', avg_length)
             log('episode', self.global_episode)
             log('step', self.global_step)
         
-        print(f"\n[评估完成] 成功率: {total_sr/episode:.2%}, 平均奖励: {total_reward/episode:.2f}")
+        print(f"\n[评估完成] 成功率: {avg_sr:.2%}, 平均奖励: {avg_reward:.2f}, 平均长度: {avg_length:.1f}")
 
     def train(self):
+        """训练主循环（修复核心逻辑）"""
         train_until_step = utils.Until(self.cfg.num_train_frames,
                                        self.cfg.action_repeat)
         seed_until_step = utils.Until(self.cfg.num_seed_frames,
@@ -225,8 +254,11 @@ class Workspace:
         pbar = tqdm(total=total_steps, desc='训练进度', unit='step')
         
         while train_until_step(self.global_step):
+            # 回合结束处理
             if time_step.last():
                 self._global_episode += 1
+                
+                # 记录训练日志
                 if metrics is not None:
                     elapsed_time, total_time = self.timer.reset()
                     episode_frame = episode_step * self.cfg.action_repeat
@@ -240,23 +272,35 @@ class Workspace:
                         log('episode', self.global_episode)
                         log('buffer_size', len(self.replay_storage))
                         log('step', self.global_step)
+                        log('current_nstep', self.nstep)
+                        log('current_discount', self.discount)
+                
+                # 保存TP集合（如果有）
                 if hasattr(self.agent, 'tp_set'):
-                    self.agent.tp_set.add(episode_reward,\
-                                            deepcopy(self.agent.actor),\
-                                            deepcopy(self.agent.critic),\
-                                            deepcopy(self.agent.critic_target),\
-                                            deepcopy(self.agent.value_predictor),\
-                                            moe=deepcopy(self.agent.actor.moe.experts),\
-                                            gate=deepcopy(self.agent.actor.moe.gate))                    
+                    self.agent.tp_set.add(
+                        episode_reward,
+                        deepcopy(self.agent.actor),
+                        deepcopy(self.agent.critic),
+                        deepcopy(self.agent.critic_target),
+                        deepcopy(self.agent.value_predictor),
+                        moe=deepcopy(self.agent.actor.moe.experts) if hasattr(self.agent.actor, 'moe') else None,
+                        gate=deepcopy(self.agent.actor.moe.gate) if hasattr(self.agent.actor, 'moe') else None
+                    )
+                
+                # 重置环境和回合状态
                 time_step = self.train_env.reset()
                 self.replay_storage.add(time_step)
+                
+                # 保存快照
                 if self.cfg.save_snapshot and self.global_step - self.last_save_step >= self.cfg.save_interval:
                     self.last_save_step = self.global_step
                     self.save_snapshot(self.global_step)
+                
                 episode_sr = False
                 episode_step = 0
                 episode_reward = 0
 
+            # 定期评估
             if eval_every_step(self.global_step):
                 pbar.set_description('评估中...')
                 self.logger.log('eval_total_time', self.timer.total_time(),
@@ -264,102 +308,156 @@ class Workspace:
                 self.eval()
                 pbar.set_description('训练进度')
 
-            with torch.no_grad(), utils.eval_mode(self.agent):
-                action = self.agent.act(time_step.observation,
-                                        self.global_step,
-                                        eval_mode=False)
+            # 生成动作：种子阶段用随机动作，非种子阶段用Agent预测
+            if seed_until_step(self.global_step):
+                # 种子帧阶段：随机探索
+                action_spec = self.train_env.action_spec()
+                action = np.random.uniform(
+                    low=action_spec.minimum,
+                    high=action_spec.maximum,
+                    size=action_spec.shape
+                ).astype(action_spec.dtype)
+            else:
+                # 非种子阶段：Agent决策
+                with torch.no_grad(), utils.eval_mode(self.agent):
+                    action = self.agent.act(time_step.observation,
+                                            self.global_step,
+                                            eval_mode=False)
 
+            # 模型更新（非种子阶段，且达到更新步长）
             if not seed_until_step(self.global_step) and self.global_step % self.cfg.update_every_steps == 0:   
+                # 先更新缓冲区nstep
+                self.update_buffer()
+                # 更新Agent
                 metrics = self.agent.update(
                     self.replay_iter, self.global_step
-                ) if self.global_step % self.cfg.update_every_steps == 0 else dict()
+                )
+                # 记录TP集合日志（如果有）
                 if hasattr(self.agent, 'tp_set'):
                     metrics = self.agent.tp_set.log(metrics)
+                # 记录训练指标
                 self.logger.log_metrics(metrics, self.global_frame, ty='train')
 
+            # 执行环境步骤
             time_step = self.train_env.step(action)
             episode_reward += time_step.reward
+            # 更新回合成功率（容错处理）
+            episode_sr = episode_sr or getattr(time_step, 'success', False)
+            # 保存到回放缓冲区
             self.replay_storage.add(time_step)
+            
+            # 更新步数
             episode_step += 1
             self._global_step += 1
             pbar.update(1)
             
+            # 更新进度条后缀
             pbar.set_postfix({
                 'episode': self.global_episode,
                 'reward': f'{episode_reward:.1f}',
-                'success': 'Yes' if episode_sr else 'No'
+                'success': 'Yes' if episode_sr else 'No',
+                'nstep': self.nstep,
+                'step': self.global_step
             })
         
         pbar.close()
+        # 训练结束后保存最终快照
+        self.save_snapshot(self.global_step)
         print("\n训练完成！")
 
     def save_snapshot(self, step_id=None):
+        """优化快照保存逻辑（Path拼接，跨平台兼容）"""
         if step_id is None:
-            snapshot = self.work_dir / 'snapshot.pt'
+            snapshot_path = self.work_dir / 'snapshot.pt'
         else:
-            if not os.path.exists(str(self.work_dir) + '/snapshots'):
-                os.makedirs(str(self.work_dir) + '/snapshots')
-            snapshot = self.work_dir / 'snapshots' / 'snapshot_{}.pt'.format(step_id)
+            snapshots_dir = self.work_dir / 'snapshots'
+            snapshots_dir.mkdir(exist_ok=True)
+            snapshot_path = snapshots_dir / f'snapshot_{step_id}.pt'
+        
+        # 要保存的参数
         keys_to_save = ['agent', 'timer', '_global_step', '_global_episode']
         payload = {k: self.__dict__[k] for k in keys_to_save}
-        with snapshot.open('wb') as f:
+        
+        # 保存
+        with snapshot_path.open('wb') as f:
             torch.save(payload, f)
-        print(f"模型已保存: {snapshot}")
+        print(f"模型已保存: {snapshot_path}")
 
     def load_snapshot(self, step_id=None, snapshot_path=None):
+        """优化快照加载逻辑（设备迁移+WandB同步）"""
+        # 确定快照路径
         if snapshot_path:
-            snapshot = Path(snapshot_path)
+            snapshot_path = Path(snapshot_path)
         elif step_id is None:
-            snapshot = self.work_dir / 'snapshot.pt'
+            snapshot_path = self.work_dir / 'snapshot.pt'
         else:
-            snapshot = self.work_dir / 'snapshots' / 'snapshot_{}.pt'.format(step_id)
-        if not snapshot.exists():
-            raise FileNotFoundError(f"Snapshot {snapshot} not found.")
-        with snapshot.open('rb') as f:
+            snapshot_path = self.work_dir / 'snapshots' / f'snapshot_{step_id}.pt'
+        
+        if not snapshot_path.exists():
+            raise FileNotFoundError(f"快照文件不存在: {snapshot_path}")
+        
+        # 加载快照
+        with snapshot_path.open('rb') as f:
             payload = torch.load(f, map_location=self.device)
         
-        # 检查是否是预训练模型（只包含actor_state_dict）
+        # 处理预训练模型（仅Actor权重）
         if 'actor_state_dict' in payload and 'agent' not in payload:
-            print("检测到预训练模型，仅加载 Actor 网络权重...")
+            print("检测到预训练模型，仅加载Actor网络权重...")
             if hasattr(self.agent, 'actor'):
+                # 加载权重并确保在指定设备
                 self.agent.actor.load_state_dict(payload['actor_state_dict'])
-                print("✓ Actor 网络权重加载成功")
+                self.agent.actor.to(self.device)
+                print("✓ Actor网络权重加载成功（已迁移到指定设备）")
             else:
-                print("⚠️  未找到 agent.actor，无法加载预训练权重")
+                print("⚠️  Agent无actor属性，无法加载预训练权重")
         else:
-            # 完整模型加载
+            # 加载完整快照
             for k, v in payload.items():
                 if k in self.__dict__:
                     self.__dict__[k] = v
-            print(f"模型已加载: {snapshot}")
+                    # 确保Agent在指定设备
+                    if k == 'agent':
+                        self.agent.to(self.device)
+            print(f"✓ 完整快照加载成功: {snapshot_path}")
+            
+            # 同步WandB步数（避免日志错位）
+            if self.cfg.use_wandb and self.wandb_init:
+                wandb.log({'global_step': self._global_step}, step=self._global_step)
+                print(f"✓ WandB步数同步完成: {self._global_step}")
 
 
 @hydra.main(config_path='piper/cfgs', config_name='config')
 def main(cfgs):
-    from train_piper import Workspace as W
-    root_dir = Path.cwd()
-    workspace = W(cfgs)
+    # 初始化工作空间
+    workspace = Workspace(cfgs)
     
+    # 确定快照路径
     snapshot_path = None
     if hasattr(cfgs, 'snapshot_path') and cfgs.snapshot_path:
         snapshot_path = cfgs.snapshot_path
     elif cfgs.load_from_id:
-        snapshot_path = str(root_dir / 'snapshots' / f'snapshot_{cfgs.load_id}.pt')
+        snapshot_path = workspace.work_dir / 'snapshots' / f'snapshot_{cfgs.load_id}.pt'
     else:
-        snapshot_path = str(root_dir / 'snapshot.pt')
+        snapshot_path = workspace.work_dir / 'snapshot.pt'
     
-    snapshot = Path(snapshot_path)
-    if snapshot.exists():
-        print(f'从 {snapshot} 恢复训练...')
-        workspace.load_snapshot(snapshot_path=str(snapshot))
+    # 加载快照（如果存在）
+    snapshot_path = Path(snapshot_path)
+    if snapshot_path.exists():
+        print(f'从快照恢复训练: {snapshot_path}')
+        workspace.load_snapshot(snapshot_path=str(snapshot_path))
     else:
-        print(f'未找到模型 {snapshot}，从头开始训练')
+        print(f'未找到快照文件 {snapshot_path}，从头开始训练')
     
+    # 执行评估或训练
     if hasattr(cfgs, 'eval_only') and cfgs.eval_only:
-        print('仅运行评估...')
+        print('进入仅评估模式...')
         workspace.eval()
     else:
         workspace.train()
+    
+    # 关闭WandB
+    if cfgs.use_wandb:
+        wandb.finish()
 
 
 if __name__ == '__main__':
