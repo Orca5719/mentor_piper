@@ -14,7 +14,7 @@ save_snapshot: true                # 是否保存模型快照
 save_interval: 10000              # 每隔多少步保存一次模型
 load_from_id: false               # 是否从指定 ID 加载模型
 load_id: 0                        # 要加载的模型 ID
-snapshot_path: ''                 # 模型快照路径（留空则使用默认路径）
+snapshot_path: 'pretrained_snapshot_256x256x9.pt'  # 预训练模型路径（从 train_manual_data.py 生成）
 eval_only: false                  # 是否只进行评估，不训练
 
 # ==================== 日志和可视化 ====================

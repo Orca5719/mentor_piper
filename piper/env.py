@@ -204,7 +204,8 @@ class PiperEnv:
         cv2.putText(display_img, "SPACE=+reward", (10, y_pos),
                    cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 0), 1)
         
-        cv2.imshow(self._window_name, display_img)
+        display_img_bgr = cv2.cvtColor(display_img, cv2.COLOR_RGB2BGR)
+        cv2.imshow(self._window_name, display_img_bgr)
         
         key = cv2.waitKey(1) & 0xFF
         if key == ord('q'):

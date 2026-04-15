@@ -165,8 +165,7 @@ class PiperRobot:
     
     def _camera_to_robot(self, camera_pos):
         if self.hand_eye_offset is not None:
-            offset_m = self.hand_eye_offset / 1000.0
-            robot_pos = camera_pos + offset_m
+            robot_pos = camera_pos + self.hand_eye_offset
             return robot_pos
         return camera_pos
     

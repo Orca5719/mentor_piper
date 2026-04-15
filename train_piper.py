@@ -316,10 +316,22 @@ class Workspace:
         if not snapshot.exists():
             raise FileNotFoundError(f"Snapshot {snapshot} not found.")
         with snapshot.open('rb') as f:
-            payload = torch.load(f)
-        for k, v in payload.items():
-            self.__dict__[k] = v
-        print(f"模型已加载: {snapshot}")
+            payload = torch.load(f, map_location=self.device)
+        
+        # 检查是否是预训练模型（只包含actor_state_dict）
+        if 'actor_state_dict' in payload and 'agent' not in payload:
+            print("检测到预训练模型，仅加载 Actor 网络权重...")
+            if hasattr(self.agent, 'actor'):
+                self.agent.actor.load_state_dict(payload['actor_state_dict'])
+                print("✓ Actor 网络权重加载成功")
+            else:
+                print("⚠️  未找到 agent.actor，无法加载预训练权重")
+        else:
+            # 完整模型加载
+            for k, v in payload.items():
+                if k in self.__dict__:
+                    self.__dict__[k] = v
+            print(f"模型已加载: {snapshot}")
 
 
 @hydra.main(config_path='piper/cfgs', config_name='config')
