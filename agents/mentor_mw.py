@@ -57,7 +57,7 @@ class Encoder(nn.Module):
         assert encoder_type in ['scratch', 'spawnnet']
                 
         if self.encoder_type == 'scratch':
-            self.repr_dim = 32 * 35 * 35
+            self.repr_dim = 32 * 121 * 121
             self.convnet = nn.Sequential(nn.Conv2d(obs_shape[0], 32, 3, stride=2),
                                         nn.ReLU(), nn.Conv2d(32, 32, 3, stride=1),
                                         nn.ReLU(), nn.Conv2d(32, 32, 3, stride=1),
@@ -238,7 +238,7 @@ class VNetwork(nn.Module):
         return v
 
 
-class MENTORAgent:
+class MENTORAgent(nn.Module):
     def __init__(self, obs_shape, action_shape, device, lr, feature_dim,
                  hidden_dim, critic_target_tau, dormant_threshold,
                  target_dormant_ratio, dormant_temp, target_lambda,
@@ -249,6 +249,7 @@ class MENTORAgent:
                  aux_loss_scale, aux_loss_type, encoder_type, resnet_fix,
                  oneXone_reg_scale, oneXone_reg_ratio, pretrained_factor, tp_set_size,
                  moe_gate_dim, moe_hidden_dim, num_experts, top_k, dropout):
+        super().__init__()
         self.device = device
         self.critic_target_tau = critic_target_tau
         self.use_tb = use_tb

@@ -85,10 +85,15 @@ class Workspace:
         self._global_step = 0
         self._global_episode = 0
 
+
     def _is_buffer_valid(self, buffer_path):
         """检查buffer路径是否有效（存在且非空）"""
+        # 确保是Path对象
+        buffer_path = Path(buffer_path)
+        
         if not buffer_path.exists():
             return False
+        
         # 检查目录下是否有数据文件（至少一个非空文件）
         try:
             files = list(buffer_path.glob('*.npz')) + list(buffer_path.glob('*.pt'))
@@ -97,31 +102,18 @@ class Workspace:
             return False
 
     def _get_buffer_path(self):
-        """获取有效的buffer路径，优先级：当前目录 > Hydra目录"""
-        # 候选路径列表
-        candidate_paths = []
+        """获取有效的buffer路径（固定为指定Path）"""
+        # 【关键修改】直接定义为Path类型的固定路径
+        target_buffer = Path("/home/isee604/mentor_mentor/mentor_piper/buffer")
         
-        # 1. 当前工作目录的buffer
-        current_buffer = self.work_dir / 'buffer'
-        candidate_paths.append(('当前工作目录', current_buffer))
+        # 检查是否有效
+        if self._is_buffer_valid(target_buffer):
+            print(f"✅ 找到有效buffer: {target_buffer}")
+            return target_buffer
         
-        # 2. Hydra输出目录的buffer（支持单次运行和批量运行）
-        if hasattr(self.cfg.hydra, 'run') and hasattr(self.cfg.hydra.run, 'dir'):
-            hydra_run_buffer = Path(self.cfg.hydra.run.dir) / 'buffer'
-            candidate_paths.append(('Hydra运行目录', hydra_run_buffer))
-        if hasattr(self.cfg.hydra, 'sweep') and hasattr(self.cfg.hydra.sweep, 'dir'):
-            hydra_sweep_buffer = Path(self.cfg.hydra.sweep.dir) / 'buffer'
-            candidate_paths.append(('Hydra批量目录', hydra_sweep_buffer))
-        
-        # 遍历候选路径，找到第一个有效的
-        for desc, path in candidate_paths:
-            if self._is_buffer_valid(path):
-                print(f"✅ 找到有效buffer: [{desc}] {path}")
-                return path
-        
-        # 都没找到，使用当前目录新建buffer
-        print(f"⚠️  未找到有效buffer，将在当前目录新建: {current_buffer}")
-        return current_buffer
+        # 无效则返回该路径用于新建
+        print(f"⚠️  未找到有效buffer，将在指定路径新建: {target_buffer}")
+        return target_buffer
 
     def setup(self):
         self.logger = Logger(self.work_dir,
@@ -129,7 +121,7 @@ class Workspace:
                              use_wandb=self.cfg.use_wandb)
         
         # 读取环境配置（增加容错）
-        use_sim = getattr(self.cfg, 'use_sim', True)
+        use_sim = getattr(self.cfg, 'use_sim', False)
         visualize = getattr(self.cfg, 'visualize', False)
         obj_pos = getattr(self.cfg, 'obj_pos', None)
         goal_pos = getattr(self.cfg, 'goal_pos', None)
@@ -154,7 +146,7 @@ class Workspace:
             hand_eye_calibration_file=hand_eye_calibration_file,
             frame_stack=self.cfg.frame_stack
         )
-        
+
         # 初始化评估环境
         self.eval_env = piper_env.make(
             self.cfg.task_name, 
@@ -172,9 +164,9 @@ class Workspace:
             frame_stack=self.cfg.frame_stack
         )
         
-        # 获取有效的buffer路径（核心修改）
+        # 获取有效的buffer路径（返回Path类型）
         buffer_path = self._get_buffer_path()
-        
+
         # 初始化回放缓冲区
         data_specs = (self.train_env.observation_spec(),
                       self.train_env.action_spec(),
@@ -190,8 +182,8 @@ class Workspace:
             self._discount - self._discount_alpha - self._discount_beta)
         self._replay_iter = None
 
-        self.video_recorder = VideoRecorder(
-            self.work_dir if self.cfg.save_video else None)
+        # self.video_recorder = VideoRecorder(
+        #     self.work_dir if self.cfg.save_video else None)
 
     @property
     def global_step(self):
@@ -228,8 +220,8 @@ class Workspace:
         current_nstep = self.nstep
         self.buffer.update_nstep(current_nstep)
         # 可选：打印nstep更新日志（便于调试）
-        if self.global_step % 1000 == 0:
-            self.logger.log('nstep', current_nstep, self.global_frame)
+        # if self.global_step % 1000 == 0:
+        #     self.logger.log('nstep', current_nstep, self.global_frame)
         return
     
     def eval(self):
@@ -241,7 +233,8 @@ class Workspace:
         while eval_until_episode(episode):
             episode_sr = False
             time_step = self.eval_env.reset()
-            self.video_recorder.init(self.eval_env, enabled=(episode == 0))
+            # breakpoint()
+            # self.video_recorder.init(self.eval_env, enabled=(episode == 0))
             
             while not time_step.last():
                 with torch.no_grad(), utils.eval_mode(self.agent):
@@ -251,14 +244,14 @@ class Workspace:
                 time_step = self.eval_env.step(action)
                 # 容错处理：避免success属性不存在
                 episode_sr = episode_sr or getattr(time_step, 'success', False)
-                self.video_recorder.record(self.eval_env)
+                # self.video_recorder.record(self.eval_env)
                 total_reward += time_step.reward
                 step += 1
 
             total_sr += episode_sr
             episode += 1
             pbar.update(1)
-            self.video_recorder.save(f'{self.global_frame}.mp4')
+            # self.video_recorder.save(f'{self.global_frame}.mp4')
         pbar.close()
         
         # 记录评估日志
@@ -277,6 +270,7 @@ class Workspace:
 
     def train(self):
         """训练主循环（修复核心逻辑）"""
+        # breakpoint()
         train_until_step = utils.Until(self.cfg.num_train_frames,
                                        self.cfg.action_repeat)
         seed_until_step = utils.Until(self.cfg.num_seed_frames,
@@ -284,7 +278,7 @@ class Workspace:
         eval_every_step = utils.Every(self.cfg.eval_every_frames,
                                       self.cfg.action_repeat)
 
-        episode_step, episode_reward, episode_sr = 0, 0, False
+        episode_step, episode_reward, episode_sr = 0, 0, 0
         time_step = self.train_env.reset()
         self.replay_storage.add(time_step)
         metrics = None
@@ -358,6 +352,7 @@ class Workspace:
                     size=action_spec.shape
                 ).astype(action_spec.dtype)
             else:
+                # breakpoint()
                 # 非种子阶段：Agent决策
                 with torch.no_grad(), utils.eval_mode(self.agent):
                     action = self.agent.act(time_step.observation,
@@ -470,13 +465,12 @@ class Workspace:
 def main(cfgs):
     # 初始化工作空间
     workspace = Workspace(cfgs)
-    
     # 确定快照路径
     snapshot_path = None
     if hasattr(cfgs, 'snapshot_path') and cfgs.snapshot_path:
         snapshot_path = cfgs.snapshot_path
     elif cfgs.load_from_id:
-        snapshot_path = workspace.work_dir / 'snapshots' / f'snapshot_{cfgs.load_id}.pt'
+        snapshot_path = workspace.work_dir / 'snapshots' / f'snapshot_{cfgs.load_from_id}.pt'
     else:
         snapshot_path = workspace.work_dir / 'snapshot.pt'
     

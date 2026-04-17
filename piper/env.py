@@ -166,10 +166,11 @@ class PiperEnv:
             print(f"键盘监听错误：{e}")
     
     def _start_keyboard_listener(self):
-        self._keyboard_running = True
-        self._keyboard_thread = threading.Thread(target=self._keyboard_listener, daemon=True)
-        self._keyboard_thread.start()
-        print("✓ 键盘监听已启动（空格=奖励）")
+        pass
+        # self._keyboard_running = True
+        # self._keyboard_thread = threading.Thread(target=self._keyboard_listener, daemon=True)
+        # self._keyboard_thread.start()
+        # print("✓ 键盘监听已启动（空格=奖励）")
     
     def _stop_keyboard_listener(self):
         self._keyboard_running = False
@@ -207,14 +208,14 @@ class PiperEnv:
         display_img_bgr = cv2.cvtColor(display_img, cv2.COLOR_RGB2BGR)
         cv2.imshow(self._window_name, display_img_bgr)
         
-        key = cv2.waitKey(1) & 0xFF
-        if key == ord('q'):
-            print("\n用户关闭可视化窗口，继续训练...")
-            self.visualize = False
-            try:
-                cv2.destroyWindow(self._window_name)
-            except:
-                pass
+        # key = cv2.waitKey(1) & 0xFF
+        # if key == ord('q'):
+        #     print("\n用户关闭可视化窗口，继续训练...")
+        #     self.visualize = False
+        #     try:
+        #         cv2.destroyWindow(self._window_name)
+        #     except:
+        #         pass
     
     @property
     def obs_space(self):

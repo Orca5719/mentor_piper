@@ -33,6 +33,7 @@ if __name__ == "__main__":
     with pyspacemouse.open() as device:
         while True:
             state = device.read()
+            # print(state)
             state_X = round(state.x*factor)
             state_Y = round(state.y*factor)
             state_Z = round(state.z*factor)
@@ -40,9 +41,9 @@ if __name__ == "__main__":
             X = round(X + state_X)
             Y = round(Y + state_Y)
             Z = round(Z + state_Z)
-            RX = round(RX)
-            RY = round(RY)    
-            RZ = round(RZ)
+            RX = round(RX + state.roll*factor)
+            RY = round(RY + state.pitch*factor)    
+            RZ = round(RZ + state.yaw*factor)
 
             piper.MotionCtrl_2(0x01, 0x00, 100, 0x00)
             piper.EndPoseCtrl(X, Y, Z, RX, RY, RZ)

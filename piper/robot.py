@@ -2,13 +2,9 @@ import numpy as np
 import time
 import cv2
 import os
+from piper_sdk import *
 
-try:
-    from piper_sdk import *
-    PiperSDK = C_PiperInterface_V2
-except ImportError:
-    print("警告：piper_sdk 未安装，将使用模拟模式")
-    PiperSDK = None
+PiperSDK = None
 
 try:
     from Camera_Module import DepthCameraModule
@@ -49,7 +45,7 @@ class PiperRobot:
         
         if not use_sim and PiperSDK is not None:
             try:
-                self.piper = PiperSDK("can0")
+                self.piper = C_PiperInterface_V2("can0")
                 self.piper.ConnectPort()
                 
                 while not self.piper.EnablePiper():
