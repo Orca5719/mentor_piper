@@ -56,7 +56,7 @@ class PiperRobotTrainer:
         self.IMG_WIDTH = 256
         self.frame_stack = 3
         self.batch_size = 256
-        self.update_every_steps = 2
+        self.update_every_episodes = 10  # 每多少个episode更新一次
         self.save_interval = 1000
         self.seed_steps = 1000
 
@@ -93,6 +93,10 @@ class PiperRobotTrainer:
         
         # 动作缩放参数
         self.action_scale = 20000
+        # 随机探索配置
+        self.random_amplitude = 0.8  # 随机动作的最大幅度（0-1）
+        self.random_drift_prob = 0.3  # 改变方向的概率
+        self.last_random_direction = np.zeros(3)  # 记录上次的随机方向
 
         # 初始化输出目录
         self.timestamp = time.strftime("%Y-%m-%d_%H-%M-%S")
@@ -262,12 +266,24 @@ class PiperRobotTrainer:
 
         # 无干预时使用随机/模型动作
         if self.agent is None or self._global_step < self.seed_steps:
-            # 随机策略：位置随机，夹爪保持稳定
-            action = np.random.uniform(
-                low=self._act_spec.minimum,
-                high=self._act_spec.maximum,
-                size=self._act_spec.shape
-            ).astype(self._act_spec.dtype)
+            # 改进的随机探索策略
+            action = np.zeros(self._act_spec.shape, dtype=self._act_spec.dtype)
+            
+            # 有一定概率改变移动方向，或者保持上一次的方向
+            if np.random.random() < self.random_drift_prob or np.linalg.norm(self.last_random_direction) == 0:
+                # 随机新方向
+                direction = np.random.uniform(-1, 1, 3)
+                direction = direction / np.linalg.norm(direction)  # 归一化
+                self.last_random_direction = direction
+            else:
+                # 保持上一次的方向，加一点随机扰动
+                direction = self.last_random_direction
+                direction += np.random.normal(0, 0.2, 3)
+                direction = direction / np.linalg.norm(direction)
+                self.last_random_direction = direction
+            
+            # 乘以幅度
+            action[:3] = direction * self.random_amplitude
             
             # 夹爪只在间隔步数后才随机切换
             if self._global_step - self.last_gripper_change_step >= self.gripper_change_interval:
@@ -275,6 +291,7 @@ class PiperRobotTrainer:
                 self.last_gripper_change_step = self._global_step
             
             action[3] = self.random_gripper_state
+            
             return action
 
         with torch.no_grad(), utils.eval_mode(self.agent):
@@ -282,20 +299,24 @@ class PiperRobotTrainer:
 
         return action
 
-    def update_policy(self):
+    def update_policy(self, num_updates=100):
         if self.agent is None or self.replay_loader is None:
             return
 
         if self._global_step < self.seed_steps:
             return
 
-        if self._global_step % self.update_every_steps != 0:
-            return
-
         try:
-            metrics = self.agent.update(self.replay_iter, self._global_step)
+            # 每次更新可以做多个batch的训练
+            print(f"\n开始更新策略，执行 {num_updates} 次梯度更新...")
+            for i in range(num_updates):
+                metrics = self.agent.update(self.replay_iter, self._global_step)
+                if i % 20 == 0:
+                    print(f"  进度: {i+1}/{num_updates}", end='\r')
+            print(f"\n✅ 策略更新完成")
             return metrics
         except Exception as e:
+            print(f"❌ 策略更新失败: {e}")
             return None
 
     def save_snapshot(self):
@@ -463,10 +484,7 @@ class PiperRobotTrainer:
                     )
                     self.replay_storage.add(ts)
 
-                    # 策略更新
-                    if self._global_step >= self.seed_steps:
-                        if self._global_step % self.update_every_steps == 0:
-                            self.update_policy()
+                    # 策略更新：不再每步更新，移到episode结束
 
                     # 模型保存
                     if self._global_step - self.last_save_step >= self.save_interval:
@@ -502,6 +520,10 @@ class PiperRobotTrainer:
                     is_last=True
                 )
                 self.replay_storage.add(ts_last)
+                
+                # 每10个episode更新一次策略
+                if (episode + 1) % self.update_every_episodes == 0 and self._global_step >= self.seed_steps:
+                    self.update_policy(num_updates=100)
 
                 # 更新总进度条描述
                 episodes_bar.set_postfix({
