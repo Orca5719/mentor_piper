@@ -92,7 +92,8 @@ class PiperRobotTrainer:
         self._buffer_dir = Path.cwd() / 'buffer_robot'
         
         # 动作缩放参数
-        self.action_scale = 20000
+        self.factor = 1000  # 与manual_collect.py对齐
+        self.action_scale = 20 * self.factor  # agent输出[-1,1] * 20 * 1000 = [-20000, 20000]
         # 随机探索配置
         self.random_amplitude = 0.8  # 随机动作的最大幅度（0-1）
         self.random_drift_prob = 0.3  # 改变方向的概率
@@ -109,6 +110,7 @@ class PiperRobotTrainer:
         self.SPACE_MOUSE_ACTION_SCALE = 2.0
         self.spacemouse_reader = None
         self.is_intervening = False
+        self.human_intervened_this_episode = False  # 标记当前episode是否有人工干预
         
         # 随机策略的夹爪状态（保持稳定）
         self.random_gripper_state = 1.0
@@ -210,7 +212,7 @@ class PiperRobotTrainer:
         return (stacked.astype(np.float32) / 255.0)
 
     def apply_action(self, action):
-        # 位置更新
+        # 位置更新：agent输出[-1,1] * 20 * factor(1000) = [-20000, 20000]
         dx = int(round(action[0] * self.action_scale))
         dy = int(round(action[1] * self.action_scale))
         dz = int(round(action[2] * self.action_scale))
@@ -241,7 +243,12 @@ class PiperRobotTrainer:
         sm_action, is_intervening = self.spacemouse_reader.get_action()
         self.is_intervening = is_intervening
 
-        if is_intervening and sm_action is not None:
+        # 如果当前episode有人工干预过，或者当前正在干预，使用人工控制
+        if self.human_intervened_this_episode or (is_intervening and sm_action is not None):
+            # 标记当前episode有人工干预
+            if is_intervening and sm_action is not None:
+                self.human_intervened_this_episode = True
+            
             dx = sm_action[0] if abs(sm_action[0]) > self.DEAD_ZONE else 0.0
             dy = sm_action[1] if abs(sm_action[1]) > self.DEAD_ZONE else 0.0
             dz = sm_action[2] if abs(sm_action[2]) > self.DEAD_ZONE else 0.0
@@ -384,7 +391,10 @@ class PiperRobotTrainer:
         y_pos += line_spacing
 
         # 干预状态
-        if self.is_intervening:
+        if self.human_intervened_this_episode:
+            cv2.putText(frame_bgr, "HUMAN LOCKED", (10, y_pos),
+                       cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 0, 255), 2)
+        elif self.is_intervening:
             cv2.putText(frame_bgr, "INTERVENING", (10, y_pos),
                        cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 0, 255), 2)
         else:
@@ -431,6 +441,7 @@ class PiperRobotTrainer:
                 self._global_episode = episode
                 self.episode_step = 0
                 self.episode_reward = 0.0
+                self.human_intervened_this_episode = False  # 每个episode开始时重置人工干预标记
 
                 # 复位机械臂
                 self.X, self.Y, self.Z = int(300614), int(-12185), int(282341)
@@ -497,7 +508,7 @@ class PiperRobotTrainer:
                     step_bar.set_postfix({
                         'Global Step': self._global_step,
                         'Reward': f"{self.episode_reward:.1f}",
-                        'Intervene': self.is_intervening
+                        'Human': self.human_intervened_this_episode
                     })
 
                     # 可视化与退出判断

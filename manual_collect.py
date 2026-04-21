@@ -158,11 +158,13 @@ class SimpleSpacemouseCollect:
     # ====================== 核心修复3：Action对齐逻辑 ======================
     def align_action(self, x, y, z, gripper_raw):
         """将3D鼠标输入对齐到环境要求的action形状和范围"""
-        # 归一化到[-1, 1]
-        dx, dy, dz = [np.clip(v * 2.0, -1.0, 1.0) for v in [x, y, z]]
+        # 将3D鼠标值映射到[-20, 20]范围，然后除以20归一化到[-1, 1]
+        dx = np.clip(x * 40.0, -20.0, 20.0) / 20.0  # [-0.5, 0.5] -> [-20, 20] -> [-1, 1]
+        dy = np.clip(y * 40.0, -20.0, 20.0) / 20.0
+        dz = np.clip(z * 40.0, -20.0, 20.0) / 20.0
         dg = np.clip((gripper_raw / 1000000.0 - 0.04) * 50.0, -1.0, 1.0)
         
-        # 自动适配不同长度的action维度
+        # 自动适配不同长度的action维度1
         action = np.zeros(self._act_spec.shape, dtype=self._act_spec.dtype)
         if self._act_spec.shape[0] >= 3:
             action[0:3] = [dx, dy, dz]
@@ -207,9 +209,14 @@ class SimpleSpacemouseCollect:
                     state = device.read()
                     
                     # 1. 机械臂物理控制
-                    self.X += round(state.x * self.factor)
-                    self.Y += round(state.y * self.factor)
-                    self.Z += round(state.z * self.factor)
+                    # 将3D鼠标值映射到[-20, 20]范围，然后乘以factor=1000
+                    state_x_clip = np.clip(state.x * 40.0, -20.0, 20.0)  # [-0.5, 0.5] -> [-20, 20]
+                    state_y_clip = np.clip(state.y * 40.0, -20.0, 20.0)
+                    state_z_clip = np.clip(state.z * 40.0, -20.0, 20.0)
+                    
+                    self.X += round(state_x_clip * self.factor)
+                    self.Y += round(state_y_clip * self.factor)
+                    self.Z += round(state_z_clip * self.factor)
                     
                     if state.buttons[0]:
                         self.joint_6 = 80000
