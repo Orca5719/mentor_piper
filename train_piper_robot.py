@@ -4,18 +4,18 @@ warnings.filterwarnings('ignore', category=DeprecationWarning)
 import os
 import sys
 import time
+import gc
 import cv2
 import numpy as np
 import torch
 import threading
-from collections import deque, namedtuple
+import math
+import hydra
+from collections import deque
 from pathlib import Path
+from copy import deepcopy
 from dm_env import StepType, specs
-from tqdm import tqdm  # 新增：导入tqdm
-
-# ========== 新增：导入3D鼠标读取模块 ==========
-from spacemouse_reader import SpacemouseReader
-# =============================================
+from tqdm import tqdm
 
 script_dir = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, script_dir)
@@ -25,132 +25,74 @@ try:
     import utils
     from logger import Logger
     import piper.env as piper_env
-    import hydra
 except ImportError as e:
     print(f"错误：无法导入核心模块: {e}")
     sys.exit(1)
 
-_TimeStepBase = namedtuple('_TimeStepBase', [
-    'observation', 'action', 'reward', 'discount', 'first', 'is_last'
-])
 
-class TimeStep(_TimeStepBase):
-    def __getitem__(self, key):
-        if isinstance(key, str):
-            return getattr(self, key)
-        return super().__getitem__(key)
-    
+class TimeStepWithAction:
+    def __init__(self, observation, action, reward, discount, step_type, success=False):
+        self.observation = observation
+        self.action = action
+        self.reward = reward
+        self.discount = discount
+        self.step_type = step_type
+        self.success = success
+        self.first = (step_type == StepType.FIRST)
+        self.is_last = (step_type == StepType.LAST)
+
     def last(self):
         return self.is_last
 
+    def __getitem__(self, key):
+        if isinstance(key, str):
+            return getattr(self, key)
+        raise KeyError(f"Invalid key: {key}")
 
-class PiperRobotTrainer:
-    def __init__(self):
-        print("="*60)
-        print("     Piper 机械臂实时训练 (支持3D鼠标干预)")
-        print("="*60)
 
-        self.work_dir = Path.cwd()
+class PiperCollectEnv:
+    def __init__(self, factor=1000, img_height=256, img_width=256, action_sleep=0.05):
+        self.factor = factor
+        self.IMG_HEIGHT = img_height
+        self.IMG_WIDTH = img_width
+        self.action_sleep = action_sleep
 
-        self.IMG_HEIGHT = 256
-        self.IMG_WIDTH = 256
-        self.frame_stack = 3
-        self.batch_size = 256
-        self.update_every_episodes = 10  # 每多少个episode更新一次
-        self.save_interval = 1000
-        self.seed_steps = 1000
+        self.X, self.Y, self.Z = 300614, -12185, 282341
+        self.RX, self.RY, self.RZ = -179351, 23933, 177934
+        self.joint_6 = 80000
 
         self.robot_cam = None
         self.piper_arm = None
-        self.agent = None
-        self.device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-
-        self._global_step = 0
-        self._global_episode = 0
-        self.last_save_step = -9999
-
         self.frames_queue = deque(maxlen=3)
-        self.replay_storage = None
-        self.replay_loader = None
-        self.replay_iter = None
-
-        self._reward = 0.0
-        self.episode_reward = 0.0
-        self.episode_step = 0
-        self._last_action = None
+        self._lock = threading.Lock()
+        self._latest_frame = None
+        self._running = True
         self._obs_spec = None
         self._act_spec = None
-        self._latest_frame = None
-        self._lock = threading.Lock()
-        self._running = True
 
-        self.factor = 1000
-        self.X, self.Y, self.Z = int(300614), int(-12185), int(282341)
-        self.RX, self.RY, self.RZ = int(-179351), int(23933), int(177934)
-        self.joint_6 = int(80000)
+        self._reward = 0.0
+        self._step_count = 0
 
-        self._buffer_dir = Path.cwd() / 'buffer_robot'
-        
-        # 动作缩放参数
-        self.factor = 1000  # 与manual_collect.py对齐
-        self.action_scale = 20 * self.factor  # agent输出[-1,1] * 20 * 1000 = [-20000, 20000]
-        # 随机探索配置
-        self.random_amplitude = 0.8  # 随机动作的最大幅度（0-1）
-        self.random_drift_prob = 0.3  # 改变方向的概率
-        self.last_random_direction = np.zeros(3)  # 记录上次的随机方向
-
-        # 初始化输出目录
-        self.timestamp = time.strftime("%Y-%m-%d_%H-%M-%S")
-        self.output_dir = Path.cwd() / "piper_outputs" / self.timestamp
-        self.output_dir.mkdir(parents=True, exist_ok=True)
-        print(f"✅ 训练输出目录: {self.output_dir.resolve()}")
-
-        # 3D鼠标配置
-        self.DEAD_ZONE = 0.1
-        self.SPACE_MOUSE_ACTION_SCALE = 2.0
-        self.spacemouse_reader = None
-        self.is_intervening = False
-        self.human_intervened_this_episode = False  # 标记当前episode是否有人工干预
-        
-        # 随机策略的夹爪状态（保持稳定）
-        self.random_gripper_state = 1.0
-        self.last_gripper_change_step = 0
-        self.gripper_change_interval = 50  # 夹爪切换间隔
-
-    def _init_replay_storage(self):
+    def _init_specs(self):
         temp_env = piper_env.make(
             task_name='piper_push', seed=0, action_repeat=2,
             size=(self.IMG_HEIGHT, self.IMG_WIDTH), use_sim=True, frame_stack=3
         )
         self._obs_spec = temp_env.observation_spec()
         self._act_spec = temp_env.action_spec()
-
-        data_specs = (
-            specs.Array(self._obs_spec.shape, self._obs_spec.dtype, 'observation'),
-            specs.Array(self._act_spec.shape, self._act_spec.dtype, 'action'),
-            specs.Array((1,), np.float32, 'reward'),
-            specs.Array((1,), np.float32, 'discount')
-        )
-
-        self._buffer_dir.mkdir(exist_ok=True)
-        self.replay_storage = ReplayBufferStorage(data_specs, self._buffer_dir)
-
-        self.replay_loader = make_replay_loader(
-            self._buffer_dir,max_size=100000, batch_size=self.batch_size, num_workers=4,
-            save_snapshot=False
-        )
-        self.replay_iter = iter(self.replay_loader)
-
         temp_env.close()
-        print("✅ 回放缓冲区初始化完成")
+
+    def observation_spec(self):
+        return self._obs_spec
+
+    def action_spec(self):
+        return self._act_spec
 
     def init_hardware(self):
-        print("初始化硬件...")
-
         from piper.robot import PiperRobot
         from piper_sdk import C_PiperInterface_V2
 
-        # 初始化相机
+        print("\n正在初始化相机...")
         self.robot_cam = PiperRobot(
             use_sim=False,
             camera_width=self.IMG_WIDTH,
@@ -158,31 +100,23 @@ class PiperRobotTrainer:
             use_apriltag=True,
             tag_size=0.05
         )
+        print("✅ 相机初始化成功")
 
-        # 初始化机械臂
+        print("正在初始化机械臂...")
         self.piper_arm = C_PiperInterface_V2("can0")
         self.piper_arm.ConnectPort()
         while not self.piper_arm.EnablePiper():
             time.sleep(0.01)
+
         self.piper_arm.MotionCtrl_2(0x01, 0x00, 100, 0x00)
         self.piper_arm.EndPoseCtrl(self.X, self.Y, self.Z, self.RX, self.RY, self.RZ)
         self.piper_arm.GripperCtrl(abs(self.joint_6), 1000, 0x01, 0)
+        print("✅ 机械臂初始化成功")
 
-        self._init_replay_storage()
-
-        # 初始化3D鼠标
-        self.spacemouse_reader = SpacemouseReader(
-            dead_zone=self.DEAD_ZONE, 
-            action_scale=self.SPACE_MOUSE_ACTION_SCALE
-        )
-        self.spacemouse_reader.start()
-        time.sleep(1.0)
+        self._init_specs()
 
         threading.Thread(target=self._image_thread, daemon=True).start()
         time.sleep(0.5)
-
-        print("✅ 硬件初始化完成")
-        print()
 
     def _image_thread(self):
         while self._running:
@@ -194,10 +128,10 @@ class PiperRobotTrainer:
                         self.frames_queue.append(frame)
                         self._latest_frame = frame.copy()
             except Exception as e:
-                pass
+                print(f"⚠️ 图像采集异常: {e}")
             time.sleep(0.002)
 
-    def get_stacked_obs(self):
+    def _get_stacked_obs(self):
         with self._lock:
             frames = list(self.frames_queue)
 
@@ -211,11 +145,10 @@ class PiperRobotTrainer:
             return stacked.astype(np.uint8)
         return (stacked.astype(np.float32) / 255.0)
 
-    def apply_action(self, action):
-        # 位置更新：agent输出[-1,1] * 20 * factor(1000) = [-20000, 20000]
-        dx = int(round(action[0] * self.action_scale))
-        dy = int(round(action[1] * self.action_scale))
-        dz = int(round(action[2] * self.action_scale))
+    def _apply_action(self, action):
+        dx = int(round(action[0] * 20 * self.factor))
+        dy = int(round(action[1] * 20 * self.factor))
+        dz = int(round(action[2] * 20 * self.factor))
 
         self.X += dx
         self.Y += dy
@@ -225,112 +158,437 @@ class PiperRobotTrainer:
         self.Y = int(np.clip(self.Y, -200000, 200000))
         self.Z = int(np.clip(self.Z, 100000, 400000))
 
-        # 夹爪控制
-        if self.is_intervening:
-            self.joint_6 = int(80000) if action[3] > 0 else int(0)
-        else:
-            self.joint_6 = int(80000) if action[3] > 0 else int(0)
+        action_shape = len(action)
+        gripper_idx = 6 if action_shape >= 7 else (3 if action_shape >= 4 else -1)
+        
+        if gripper_idx >= 0 and gripper_idx < action_shape:
+            self.joint_6 = int(80000) if action[gripper_idx] > 0 else int(0)
 
-        # 执行动作
         self.piper_arm.MotionCtrl_2(0x01, 0x00, 100, 0x00)
         self.piper_arm.EndPoseCtrl(self.X, self.Y, self.Z, self.RX, self.RY, self.RZ)
         self.piper_arm.GripperCtrl(abs(self.joint_6), 1000, 0x01, 0)
 
-        time.sleep(0.01)
+        time.sleep(self.action_sleep)
 
-    def get_action(self, obs):
-        # 优先使用3D鼠标动作
-        sm_action, is_intervening = self.spacemouse_reader.get_action()
+    def reset(self):
+        self.X, self.Y, self.Z = 300614, -12185, 282341
+        self.joint_6 = 80000
+        self.piper_arm.EndPoseCtrl(self.X, self.Y, self.Z, self.RX, self.RY, self.RZ)
+        self.piper_arm.GripperCtrl(abs(self.joint_6), 1000, 0x01, 0)
+
+        self.frames_queue.clear()
+        for _ in range(3):
+            frame = self.robot_cam.get_camera_image()
+            if frame is not None:
+                self.frames_queue.append(frame)
+
+        self._reward = 0.0
+        self._step_count = 0
+
+        obs = self._get_stacked_obs()
+        return TimeStepWithAction(
+            observation=obs,
+            action=np.zeros(self._act_spec.shape, dtype=self._act_spec.dtype),
+            reward=np.array([0.0], dtype=np.float32),
+            discount=np.array([1.0], dtype=np.float32),
+            step_type=StepType.FIRST
+        )
+
+    def step(self, action, reward=0.0):
+        self._apply_action(action)
+
+        new_frame = self.robot_cam.get_camera_image()
+        if new_frame is not None:
+            self.frames_queue.append(new_frame)
+
+        obs = self._get_stacked_obs()
+        self._reward = reward
+        self._step_count += 1
+
+        return TimeStepWithAction(
+            observation=obs,
+            action=action,
+            reward=np.array([self._reward], dtype=np.float32),
+            discount=np.array([1.0], dtype=np.float32),
+            step_type=StepType.MID
+        )
+
+    def step_last(self, action):
+        self._apply_action(action)
+
+        new_frame = self.robot_cam.get_camera_image()
+        if new_frame is not None:
+            self.frames_queue.append(new_frame)
+
+        obs = self._get_stacked_obs()
+
+        return TimeStepWithAction(
+            observation=obs,
+            action=action,
+            reward=np.array([0.0], dtype=np.float32),
+            discount=np.array([0.0], dtype=np.float32),
+            step_type=StepType.LAST
+        )
+
+    def get_latest_frame(self):
+        with self._lock:
+            return self._latest_frame.copy() if self._latest_frame is not None else None
+
+    def close(self):
+        self._running = False
+        time.sleep(0.3)
+        if self.piper_arm is not None:
+            self.piper_arm.EmergencyStop()
+            self.piper_arm.DisconnectPort()
+        if self.robot_cam is not None:
+            self.robot_cam.close()
+
+
+class Workspace:
+    def __init__(self, cfg=None):
+        self.work_dir = Path.cwd()
+        self.cfg = cfg
+
+        self.IMG_HEIGHT = 256
+        self.IMG_WIDTH = 256
+        self.frame_stack = 3
+        self.batch_size = 256
+        self.update_every_episodes = 2
+        self.save_interval = 1000
+        self.seed_steps = 1000
+        self.action_sleep = 0.05
+
+        self.device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+        self._discount = 0.99
+        self._discount_alpha = 0.0
+        self._discount_alpha_temp = 1.0
+        self._discount_beta = 0.0
+        self._discount_beta_temp = 1.0
+        self._nstep = 3
+        self._nstep_alpha = 0.0
+        self._nstep_alpha_temp = 1.0
+
+        self._global_step = 0
+        self._global_episode = 0
+        self.last_save_step = -9999
+
+        self.replay_storage = None
+        self.replay_loader = None
+        self.replay_iter = None
+        self.buffer = None
+        self.agent = None
+
+        self._buffer_dir = Path.cwd() / 'buffer'
+
+        self.env = PiperCollectEnv(
+            factor=1000,
+            img_height=self.IMG_HEIGHT,
+            img_width=self.IMG_WIDTH,
+            action_sleep=self.action_sleep
+        )
+
+        self.human_intervened_this_episode = False
+        self.is_intervening = False
+
+        self.DEAD_ZONE = 0.1
+        self.SPACE_MOUSE_ACTION_SCALE = 1.0
+
+        self.random_amplitude = 0.8
+        self.random_drift_prob = 0.3
+        self.last_random_direction = np.zeros(3)
+        self.random_gripper_state = 1.0
+        self.last_gripper_change_step = 0
+        self.gripper_change_interval = 50
+
+        self.logger = None
+        self.timer = utils.Timer()
+
+        self.timestamp = time.strftime("%Y-%m-%d_%H-%M-%S")
+        self.output_dir = Path.cwd() / "piper_outputs" / self.timestamp
+        self.output_dir.mkdir(parents=True, exist_ok=True)
+
+    @property
+    def global_step(self):
+        return self._global_step
+
+    @property
+    def global_episode(self):
+        return self._global_episode
+
+    @property
+    def replay_iter(self):
+        if self._replay_iter is None:
+            self._replay_iter = iter(self.replay_loader)
+        return self._replay_iter
+
+    @property
+    def discount(self):
+        return self._discount - self._discount_alpha * math.exp(
+            -self.global_step / self._discount_alpha_temp) - self._discount_beta * math.exp(
+                -self.global_step / self._discount_beta_temp)
+
+    @property
+    def nstep(self):
+        return math.floor(self._nstep + self._nstep_alpha *
+                          math.exp(-self.global_step / self._nstep_alpha_temp))
+
+    def setup(self):
+        self.logger = Logger(self.work_dir, use_tb=False, use_wandb=False)
+
+        self.env.init_hardware()
+
+        data_specs = (
+            self.env.observation_spec(),
+            self.env.action_spec(),
+            specs.Array((1,), np.float32, 'reward'),
+            specs.Array((1,), np.float32, 'discount')
+        )
+
+        self._buffer_dir.mkdir(exist_ok=True)
+        self.replay_storage = ReplayBufferStorage(data_specs, self._buffer_dir)
+
+        self.replay_loader, self.buffer = make_replay_loader(
+            self._buffer_dir, max_size=100000, batch_size=self.batch_size,
+            num_workers=4, save_snapshot=False,
+            nstep=math.floor(self._nstep + self._nstep_alpha),
+            discount=self._discount - self._discount_alpha - self._discount_beta
+        )
+        self._replay_iter = None
+
+        print(f"✅ Buffer路径: {self._buffer_dir.resolve()}")
+        print(f"✅ Buffer大小: {len(self.replay_storage)}")
+
+    def update_buffer(self):
+        current_nstep = self.nstep
+        self.buffer.update_nstep(current_nstep)
+
+    def make_agent(self, cfg):
+        cfg.obs_shape = self.env.observation_spec().shape
+        cfg.action_shape = self.env.action_spec().shape
+        self.agent = hydra.utils.instantiate(cfg.agent)
+        self.agent = self.agent.to(self.device)
+        print("✅ Agent初始化成功")
+
+    def get_action(self, obs, eval_mode=False):
+        sm_action, is_intervening = self._read_spacemouse()
         self.is_intervening = is_intervening
 
-        # 如果当前episode有人工干预过，或者当前正在干预，使用人工控制
-        if self.human_intervened_this_episode or (is_intervening and sm_action is not None):
-            # 标记当前episode有人工干预
-            if is_intervening and sm_action is not None:
-                self.human_intervened_this_episode = True
-            
+        if self.human_intervened_this_episode:
+            if sm_action is None:
+                sm_action = np.zeros(self.env.action_spec().shape, dtype=np.float32)
+                is_intervening = False
+
             dx = sm_action[0] if abs(sm_action[0]) > self.DEAD_ZONE else 0.0
             dy = sm_action[1] if abs(sm_action[1]) > self.DEAD_ZONE else 0.0
             dz = sm_action[2] if abs(sm_action[2]) > self.DEAD_ZONE else 0.0
 
-            # 夹爪控制
-            sm_gripper = sm_action[6]
-            if abs(sm_gripper) > self.DEAD_ZONE:
-                gripper_ctrl = 1.0 if sm_gripper > 0 else -1.0
-            else:
-                gripper_ctrl = 1.0 if self.joint_6 > 0 else -1.0
+            action_shape = self.env.action_spec().shape[0]
+            gripper_idx = 6 if action_shape >= 7 else (3 if action_shape >= 4 else -1)
 
-            # 构造动作
-            override_action = np.array([
-                dx * self.SPACE_MOUSE_ACTION_SCALE,
-                dy * self.SPACE_MOUSE_ACTION_SCALE,
-                dz * self.SPACE_MOUSE_ACTION_SCALE,
-                gripper_ctrl
-            ], dtype=self._act_spec.dtype)
-            override_action = np.clip(override_action, self._act_spec.minimum, self._act_spec.maximum)
-            
+            if gripper_idx >= 0 and gripper_idx < len(sm_action):
+                sm_gripper = sm_action[gripper_idx]
+                if abs(sm_gripper) > self.DEAD_ZONE:
+                    gripper_ctrl = 1.0 if sm_gripper > 0 else -1.0
+                else:
+                    gripper_ctrl = 1.0 if self.env.joint_6 > 0 else -1.0
+            else:
+                gripper_ctrl = 1.0 if self.env.joint_6 > 0 else -1.0
+
+            override_action = np.zeros(action_shape, dtype=self.env.action_spec().dtype)
+            override_action[0] = dx * self.SPACE_MOUSE_ACTION_SCALE
+            override_action[1] = dy * self.SPACE_MOUSE_ACTION_SCALE
+            override_action[2] = dz * self.SPACE_MOUSE_ACTION_SCALE
+            if gripper_idx >= 0 and gripper_idx < action_shape:
+                override_action[gripper_idx] = gripper_ctrl
+
             return override_action
 
-        # 无干预时使用随机/模型动作
+        if is_intervening and sm_action is not None:
+            self.human_intervened_this_episode = True
+
+            dx = sm_action[0] if abs(sm_action[0]) > self.DEAD_ZONE else 0.0
+            dy = sm_action[1] if abs(sm_action[1]) > self.DEAD_ZONE else 0.0
+            dz = sm_action[2] if abs(sm_action[2]) > self.DEAD_ZONE else 0.0
+
+            action_shape = self.env.action_spec().shape[0]
+            gripper_idx = 6 if action_shape >= 7 else (3 if action_shape >= 4 else -1)
+
+            if gripper_idx >= 0 and gripper_idx < len(sm_action):
+                sm_gripper = sm_action[gripper_idx]
+                if abs(sm_gripper) > self.DEAD_ZONE:
+                    gripper_ctrl = 1.0 if sm_gripper > 0 else -1.0
+                else:
+                    gripper_ctrl = 1.0 if self.env.joint_6 > 0 else -1.0
+            else:
+                gripper_ctrl = 1.0 if self.env.joint_6 > 0 else -1.0
+
+            override_action = np.zeros(action_shape, dtype=self.env.action_spec().dtype)
+            override_action[0] = dx * self.SPACE_MOUSE_ACTION_SCALE
+            override_action[1] = dy * self.SPACE_MOUSE_ACTION_SCALE
+            override_action[2] = dz * self.SPACE_MOUSE_ACTION_SCALE
+            if gripper_idx >= 0 and gripper_idx < action_shape:
+                override_action[gripper_idx] = gripper_ctrl
+
+            return override_action
+
         if self.agent is None or self._global_step < self.seed_steps:
-            # 改进的随机探索策略
-            action = np.zeros(self._act_spec.shape, dtype=self._act_spec.dtype)
-            
-            # 有一定概率改变移动方向，或者保持上一次的方向
+            action = np.zeros(self.env.action_spec().shape, dtype=self.env.action_spec().dtype)
+
             if np.random.random() < self.random_drift_prob or np.linalg.norm(self.last_random_direction) == 0:
-                # 随机新方向
                 direction = np.random.uniform(-1, 1, 3)
-                direction = direction / np.linalg.norm(direction)  # 归一化
+                direction = direction / np.linalg.norm(direction)
                 self.last_random_direction = direction
             else:
-                # 保持上一次的方向，加一点随机扰动
                 direction = self.last_random_direction
                 direction += np.random.normal(0, 0.2, 3)
                 direction = direction / np.linalg.norm(direction)
                 self.last_random_direction = direction
-            
-            # 乘以幅度
+
             action[:3] = direction * self.random_amplitude
-            
-            # 夹爪只在间隔步数后才随机切换
-            if self._global_step - self.last_gripper_change_step >= self.gripper_change_interval:
+
+            action_shape = self.env.action_spec().shape[0]
+            gripper_idx = 6 if action_shape >= 7 else (3 if action_shape >= 4 else -1)
+            if gripper_idx >= 0 and self._global_step - self.last_gripper_change_step >= self.gripper_change_interval:
                 self.random_gripper_state = np.random.choice([1.0, -1.0])
                 self.last_gripper_change_step = self._global_step
-            
-            action[3] = self.random_gripper_state
-            
+
+            if gripper_idx >= 0:
+                action[gripper_idx] = self.random_gripper_state
+
             return action
 
         with torch.no_grad(), utils.eval_mode(self.agent):
-            action = self.agent.act(obs, self._global_step, eval_mode=False)
+            action = self.agent.act(obs, self._global_step, eval_mode=eval_mode)
 
         return action
 
+    def _read_spacemouse(self):
+        try:
+            import pyspacemouse
+            state = pyspacemouse.read()
+            if state is None:
+                return None, False
+
+            magnitude = np.sqrt(state.x**2 + state.y**2 + state.z**2)
+            is_intervening = magnitude > self.DEAD_ZONE
+
+            action_shape = self.env.action_spec().shape[0]
+            action = np.zeros(action_shape, dtype=np.float32)
+            action[0] = state.x
+            action[1] = state.y
+            action[2] = state.z
+            
+            gripper_idx = 6 if action_shape >= 7 else (3 if action_shape >= 4 else -1)
+            if gripper_idx >= 0:
+                if hasattr(state, 'buttons') and state.buttons is not None:
+                    if len(state.buttons) > 0 and state.buttons[0]:
+                        action[gripper_idx] = 1.0
+                    elif len(state.buttons) > 1 and state.buttons[1]:
+                        action[gripper_idx] = -1.0
+                    else:
+                        action[gripper_idx] = 0.0
+                else:
+                    action[gripper_idx] = 0.0
+            
+            return action, is_intervening
+        except:
+            return None, False
+
+    def visualize(self, episode, step, max_steps, episode_reward, is_training=True):
+        frame = self.env.get_latest_frame()
+        if frame is None:
+            return True, 0.0
+
+        frame_bgr = cv2.cvtColor(frame, cv2.COLOR_RGB2BGR)
+
+        y_pos = 30
+        line_spacing = 25
+
+        mode_str = "TRAINING" if is_training else "EVAL"
+        mode_color = (0, 255, 0) if is_training else (255, 255, 0)
+        cv2.putText(frame_bgr, mode_str, (10, y_pos),
+                   cv2.FONT_HERSHEY_SIMPLEX, 0.7, mode_color, 2)
+        y_pos += line_spacing
+
+        if self.human_intervened_this_episode:
+            cv2.putText(frame_bgr, "HUMAN LOCKED", (10, y_pos),
+                       cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 0, 255), 2)
+        elif self.is_intervening:
+            cv2.putText(frame_bgr, "INTERVENING", (10, y_pos),
+                       cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 0, 255), 2)
+        else:
+            cv2.putText(frame_bgr, "Model Control", (10, y_pos),
+                       cv2.FONT_HERSHEY_SIMPLEX, 0.6, (255, 255, 0), 2)
+        y_pos += line_spacing
+
+        gripper_status = "GRIPPER: OPEN" if self.env.joint_6 > 40000 else "GRIPPER: CLOSED"
+        gripper_color = (0, 255, 0) if self.env.joint_6 > 40000 else (0, 0, 255)
+        cv2.putText(frame_bgr, gripper_status, (10, y_pos),
+                   cv2.FONT_HERSHEY_SIMPLEX, 0.6, gripper_color, 2)
+        y_pos += line_spacing
+
+        cv2.putText(frame_bgr, f"Ep: {episode+1} Step: {step+1}/{max_steps}", (10, y_pos),
+                   cv2.FONT_HERSHEY_SIMPLEX, 0.6, (255, 255, 255), 2)
+        y_pos += line_spacing
+        cv2.putText(frame_bgr, f"Reward: {episode_reward:.1f}", (10, y_pos),
+                   cv2.FONT_HERSHEY_SIMPLEX, 0.6, (255, 255, 255), 2)
+        y_pos += line_spacing
+        cv2.putText(frame_bgr, f"Buffer: {len(self.replay_storage)}", (10, y_pos),
+                   cv2.FONT_HERSHEY_SIMPLEX, 0.6, (255, 255, 0), 2)
+        y_pos += line_spacing
+
+        cv2.putText(frame_bgr, "SPACE=+10&End, s=Save, q=Quit", (10, y_pos),
+                   cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 200, 255), 1)
+
+        cv2.imshow("Piper Robot", frame_bgr)
+
+        key = cv2.waitKey(1) & 0xFF
+        manual_reward = 0.0
+        if key == ord(' '):
+            manual_reward = 10.0
+            print(f"[奖励] Ep{episode+1} Step{step+1} | +10.0")
+        elif key == ord('s'):
+            self.save_snapshot()
+        elif key == ord('q'):
+            return False, manual_reward
+
+        return True, manual_reward
+
     def update_policy(self, num_updates=100):
         if self.agent is None or self.replay_loader is None:
-            return
+            return None
 
         if self._global_step < self.seed_steps:
-            return
+            return None
 
         try:
-            # 每次更新可以做多个batch的训练
+            self.update_buffer()
             print(f"\n开始更新策略，执行 {num_updates} 次梯度更新...")
+            metrics = None
             for i in range(num_updates):
                 metrics = self.agent.update(self.replay_iter, self._global_step)
                 if i % 20 == 0:
                     print(f"  进度: {i+1}/{num_updates}", end='\r')
+            
+            if torch.cuda.is_available():
+                torch.cuda.empty_cache()
+            gc.collect()
+            
             print(f"\n✅ 策略更新完成")
             return metrics
         except Exception as e:
             print(f"❌ 策略更新失败: {e}")
             return None
 
-    def save_snapshot(self):
+    def save_snapshot(self, step_id=None):
         if self.agent is None:
             return
 
-        snapshot_path = self.output_dir / f'snapshot_robot_{self._global_step}.pt'
+        if step_id is None:
+            snapshot_path = self.output_dir / 'snapshot.pt'
+        else:
+            snapshot_path = self.output_dir / f'snapshot_{step_id}.pt'
+
         payload = {
             'agent': self.agent,
             '_global_step': self._global_step,
@@ -368,180 +626,112 @@ class PiperRobotTrainer:
             print(f"❌ 加载快照失败: {e}")
             return False
 
-    def visualize(self, obs, reward, episode_step):
-        if self._latest_frame is None:
-            return True
-
-        frame = self._latest_frame.copy()
-        frame_bgr = cv2.cvtColor(frame, cv2.COLOR_RGB2BGR)
-
-        y_pos = 30
-        line_spacing = 25
-
-        # 基础状态显示
-        if self._global_step < self.seed_steps:
-            cv2.putText(frame_bgr, "SEEDING...", (10, y_pos),
-                       cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 140, 255), 2)
-            y_pos += line_spacing
-            cv2.putText(frame_bgr, f"Seed: {self._global_step}/{self.seed_steps}", (10, y_pos),
-                       cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 140, 255), 1)
-        else:
-            cv2.putText(frame_bgr, "TRAINING", (10, y_pos),
-                       cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 255, 0), 2)
-        y_pos += line_spacing
-
-        # 干预状态
-        if self.human_intervened_this_episode:
-            cv2.putText(frame_bgr, "HUMAN LOCKED", (10, y_pos),
-                       cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 0, 255), 2)
-        elif self.is_intervening:
-            cv2.putText(frame_bgr, "INTERVENING", (10, y_pos),
-                       cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 0, 255), 2)
-        else:
-            cv2.putText(frame_bgr, "Model Control", (10, y_pos),
-                       cv2.FONT_HERSHEY_SIMPLEX, 0.6, (255, 255, 0), 2)
-        y_pos += line_spacing
-
-        # 核心进度信息
-        cv2.putText(frame_bgr, f"Step: {self._global_step}", (10, y_pos),
-                   cv2.FONT_HERSHEY_SIMPLEX, 0.6, (255, 255, 255), 2)
-        y_pos += line_spacing
-        cv2.putText(frame_bgr, f"Episode: {self._global_episode + 1}", (10, y_pos),
-                   cv2.FONT_HERSHEY_SIMPLEX, 0.6, (255, 255, 255), 2)
-        y_pos += line_spacing
-        cv2.putText(frame_bgr, f"Reward: {self.episode_reward:.1f}", (10, y_pos),
-                   cv2.FONT_HERSHEY_SIMPLEX, 0.6, (255, 255, 255), 2)
-        y_pos += line_spacing
-
-        # 操作提示
-        cv2.putText(frame_bgr, "SPACE=+10, s=Save, q=Quit", (10, y_pos),
-                   cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 200, 255), 1)
-
-        cv2.imshow("Piper Robot Training", frame_bgr)
-
-        key = cv2.waitKey(1) & 0xFF
-        if key == ord(' '):
-            self._reward += 10.0
-        elif key == ord('s'):
-            self.save_snapshot()
-        elif key == ord('q'):
-            return False
-
-        return True
-
-    def train(self, num_episodes=100, max_steps_per_episode=200):
+    def train(self, num_episodes=100, max_steps_per_episode=200, episode_sleep=2.0):
         print("\n开始训练...")
         print("="*60)
 
-        # 总Episode进度条
         episodes_bar = tqdm(range(num_episodes), desc="Episodes", unit="episode")
-        
+
         try:
             for episode in episodes_bar:
                 self._global_episode = episode
-                self.episode_step = 0
-                self.episode_reward = 0.0
-                self.human_intervened_this_episode = False  # 每个episode开始时重置人工干预标记
+                self.human_intervened_this_episode = False
+                episode_reward = 0.0
 
-                # 复位机械臂
-                self.X, self.Y, self.Z = int(300614), int(-12185), int(282341)
-                self.RX, self.RY, self.RZ = int(-179351), int(23933), int(177934)
-                self.joint_6 = int(80000)
-                self.piper_arm.MotionCtrl_2(0x01, 0x00, 100, 0x00)
-                self.piper_arm.EndPoseCtrl(self.X, self.Y, self.Z, self.RX, self.RY, self.RZ)
-                self.piper_arm.GripperCtrl(abs(self.joint_6), 1000, 0x01, 0)
+                self.env.X, self.env.Y, self.env.Z = 300614, -12185, 282341
+                self.env.joint_6 = 80000
+                self.env.piper_arm.EndPoseCtrl(self.env.X, self.env.Y, self.env.Z, self.env.RX, self.env.RY, self.env.RZ)
+                self.env.piper_arm.GripperCtrl(abs(self.env.joint_6), 1000, 0x01, 0)
                 time.sleep(1.0)
 
-                # 重置帧队列
-                self.frames_queue.clear()
-                for _ in range(self.frame_stack):
-                    frame = self.robot_cam.get_camera_image()
-                    if frame is not None:
-                        self.frames_queue.append(frame)
+                time_step = self.env.reset()
+                self.replay_storage.add(time_step)
 
-                obs_prev = self.get_stacked_obs()
-
-                # 单Episode内Step进度条
                 step_bar = tqdm(range(max_steps_per_episode), desc=f"Episode {episode+1}", unit="step", leave=False)
+                episode_ended_early = False
+
                 for step in step_bar:
-                    self.episode_step = step
-                    self._global_step += 1
+                    obs_prev = time_step.observation
+                    action = self.get_action(obs_prev, eval_mode=False)
 
-                    # 获取并执行动作
-                    action = self.get_action(obs_prev)
-                    self._last_action = action
-                    self.apply_action(action)
-
-                    # 更新观测
-                    new_frame = self.robot_cam.get_camera_image()
-                    if new_frame is not None:
-                        self.frames_queue.append(new_frame)
-                    obs_curr = self.get_stacked_obs()
-
-                    # 奖励处理
-                    reward = self._reward
-                    if self._reward != 0:
-                        self._reward = 0
-                    self.episode_reward += reward
-
-                    # 存入缓冲区
-                    ts = TimeStep(
-                        observation=obs_prev,
-                        action=action,
-                        reward=np.array([reward], dtype=np.float32),
-                        discount=np.array([1.0], dtype=np.float32),
-                        first=(step == 0),
-                        is_last=False
-                    )
-                    self.replay_storage.add(ts)
-
-                    # 策略更新：不再每步更新，移到episode结束
-
-                    # 模型保存
-                    if self._global_step - self.last_save_step >= self.save_interval:
-                        self.last_save_step = self._global_step
-                        self.save_snapshot()
-
-                    obs_prev = obs_curr
-
-                    # 更新进度条描述
-                    step_bar.set_postfix({
-                        'Global Step': self._global_step,
-                        'Reward': f"{self.episode_reward:.1f}",
-                        'Human': self.human_intervened_this_episode
-                    })
-
-                    # 可视化与退出判断
-                    continue_training = self.visualize(obs_curr, reward, step)
-                    if not continue_training:
+                    continue_vis, manual_reward = self.visualize(episode, step, max_steps_per_episode, episode_reward, is_training=True)
+                    if not continue_vis:
                         step_bar.close()
                         episodes_bar.close()
                         print("\n用户退出训练")
                         return
 
-                step_bar.close()
+                    if manual_reward > 0:
+                        time_step = self.env.step_last(action)
+                        ts = TimeStepWithAction(
+                            observation=time_step.observation,
+                            action=action,
+                            reward=np.array([manual_reward], dtype=np.float32),
+                            discount=np.array([0.0], dtype=np.float32),
+                            step_type=StepType.LAST
+                        )
+                        self.replay_storage.add(ts)
+                        episode_reward += manual_reward
+                        self._global_step += 1
+                        episode_ended_early = True
+                        step_bar.close()
+                        break
 
-                # Episode结束处理
-                ts_last = TimeStep(
-                    observation=self.get_stacked_obs(),
-                    action=self._last_action,
-                    reward=np.array([0.0], dtype=np.float32),
-                    discount=np.array([0.0], dtype=np.float32),
-                    first=False,
-                    is_last=True
-                )
-                self.replay_storage.add(ts_last)
-                
-                # 每10个episode更新一次策略
+                    time_step = self.env.step(action, reward=0.0)
+                    episode_reward += time_step.reward[0]
+
+                    self.replay_storage.add(time_step)
+
+                    self._global_step += 1
+
+                    if self._global_step % 1000 == 0:
+                        if torch.cuda.is_available():
+                            torch.cuda.empty_cache()
+                        gc.collect()
+
+                    if self._global_step - self.last_save_step >= self.save_interval:
+                        self.last_save_step = self._global_step
+                        self.save_snapshot(self._global_step)
+
+                    step_bar.set_postfix({
+                        'Global Step': self._global_step,
+                        'Reward': f"{episode_reward:.1f}",
+                        'Human': self.human_intervened_this_episode
+                    })
+
+                if not episode_ended_early:
+                    step_bar.close()
+                    state = self._read_spacemouse()[0]
+                    action_shape = self.env.action_spec().shape[0]
+                    gripper_idx = 6 if action_shape >= 7 else (3 if action_shape >= 4 else -1)
+                    if state is not None:
+                        action = np.zeros(action_shape, dtype=np.float32)
+                        action[0] = state[0]
+                        action[1] = state[1]
+                        action[2] = state[2]
+                        if gripper_idx >= 0:
+                            action[gripper_idx] = 1.0 if self.env.joint_6 > 0 else -1.0
+                    else:
+                        action = np.zeros(self.env.action_spec().shape, dtype=self.env.action_spec().dtype)
+                        if gripper_idx >= 0:
+                            action[gripper_idx] = 1.0
+
+                    ts_last = self.env.step_last(action)
+                    self.replay_storage.add(ts_last)
+
                 if (episode + 1) % self.update_every_episodes == 0 and self._global_step >= self.seed_steps:
-                    self.update_policy(num_updates=100)
+                    metrics = self.update_policy(num_updates=100)
+                    if metrics and self.logger:
+                        self.logger.log_metrics(metrics, self.global_step, ty='train')
 
-                # 更新总进度条描述
                 episodes_bar.set_postfix({
-                    'Last Reward': f"{self.episode_reward:.1f}",
+                    'Last Reward': f"{episode_reward:.1f}",
                     'Buffer Size': len(self.replay_storage),
                     'Global Step': self._global_step
                 })
+
+                print(f"请重新摆放物体... 休眠 {episode_sleep}s")
+                time.sleep(episode_sleep)
 
         except KeyboardInterrupt:
             print("\n用户中断训练")
@@ -549,24 +739,94 @@ class PiperRobotTrainer:
             episodes_bar.close()
             self.cleanup()
 
+    def eval(self, num_episodes=10, max_steps_per_episode=200):
+        print("\n开始评估...")
+        print("="*60)
+
+        if self.agent is None:
+            print("❌ 没有可用的agent进行评估")
+            return
+
+        total_reward = 0.0
+        total_success = 0
+
+        episodes_bar = tqdm(range(num_episodes), desc="Eval Episodes", unit="episode")
+
+        try:
+            for episode in episodes_bar:
+                self.human_intervened_this_episode = False
+                episode_reward = 0.0
+
+                self.env.X, self.env.Y, self.env.Z = 300614, -12185, 282341
+                self.env.joint_6 = 80000
+                self.env.piper_arm.EndPoseCtrl(self.env.X, self.env.Y, self.env.Z, self.env.RX, self.env.RY, self.env.RZ)
+                self.env.piper_arm.GripperCtrl(abs(self.env.joint_6), 1000, 0x01, 0)
+                time.sleep(1.0)
+
+                time_step = self.env.reset()
+
+                step_bar = tqdm(range(max_steps_per_episode), desc=f"Eval Ep {episode+1}", unit="step", leave=False)
+
+                for step in step_bar:
+                    obs = time_step.observation
+                    action = self.get_action(obs, eval_mode=True)
+
+                    continue_vis, _ = self.visualize(episode, step, max_steps_per_episode, episode_reward, is_training=False)
+                    if not continue_vis:
+                        step_bar.close()
+                        episodes_bar.close()
+                        return
+
+                    time_step = self.env.step(action, reward=0.0)
+                    episode_reward += time_step.reward[0]
+
+                    step_bar.set_postfix({
+                        'Reward': f"{episode_reward:.1f}"
+                    })
+
+                step_bar.close()
+
+                state = self._read_spacemouse()[0]
+                action_shape = self.env.action_spec().shape[0]
+                gripper_idx = 6 if action_shape >= 7 else (3 if action_shape >= 4 else -1)
+                if state is not None:
+                    action = np.zeros(action_shape, dtype=np.float32)
+                    action[0] = state[0]
+                    action[1] = state[1]
+                    action[2] = state[2]
+                    if gripper_idx >= 0:
+                        action[gripper_idx] = 1.0 if self.env.joint_6 > 0 else -1.0
+                else:
+                    action = np.zeros(self.env.action_spec().shape, dtype=self.env.action_spec().dtype)
+                    if gripper_idx >= 0:
+                        action[gripper_idx] = 1.0
+
+                ts_last = self.env.step_last(action)
+
+                total_reward += episode_reward
+
+                episodes_bar.set_postfix({
+                    'Avg Reward': f"{total_reward / (episode + 1):.1f}"
+                })
+
+                time.sleep(1.0)
+
+        except KeyboardInterrupt:
+            print("\n用户中断评估")
+        finally:
+            episodes_bar.close()
+
+        avg_reward = total_reward / num_episodes if num_episodes > 0 else 0.0
+        print(f"\n✅ 评估完成 | 平均奖励: {avg_reward:.2f}")
+
     def cleanup(self):
         print("\n清理资源...")
         self._running = False
         time.sleep(0.3)
         cv2.destroyAllWindows()
 
-        # 停止3D鼠标
-        if self.spacemouse_reader is not None:
-            self.spacemouse_reader.stop()
-
-        # 关闭机械臂
-        if self.piper_arm is not None:
-            self.piper_arm.EmergencyStop()
-            self.piper_arm.DisconnectPort()
-
-        # 关闭相机
-        if self.robot_cam is not None:
-            self.robot_cam.close()
+        if self.env is not None:
+            self.env.close()
 
         print("✅ 训练结束，资源已清理")
 
@@ -574,44 +834,40 @@ class PiperRobotTrainer:
 def main():
     import argparse
 
-    parser = argparse.ArgumentParser(description='Piper 机械臂实时训练 (支持3D鼠标干预)')
-    parser.add_argument('--snapshot', type=str, default=r"/home/isee604/mentor_mentor/mentor_piper/piper_outputs/2026-04-17_20-01-46/snapshot_robot_14253.pt", help='预训练权重路径')
+    parser = argparse.ArgumentParser(description='Piper 机械臂训练 (支持3D鼠标干预)')
+    parser.add_argument('--snapshot', type=str, default=None, help='预训练权重路径')
     parser.add_argument('--episodes', type=int, default=1000, help='训练 episode 数量')
     parser.add_argument('--steps', type=int, default=1500, help='每个 episode 最大步数')
+    parser.add_argument('--eval', action='store_true', help='仅进行评估')
+    parser.add_argument('--eval_episodes', type=int, default=10, help='评估 episode 数量')
+    parser.add_argument('--action_sleep', type=float, default=0.05, help='机械臂动作间隔时间(秒)')
+    parser.add_argument('--buffer_dir', type=str, default='buffer', help='Buffer目录路径')
 
     args = parser.parse_args()
 
+    cfg = None
     try:
         with hydra.initialize(config_path='piper/cfgs', version_base=None):
             cfg = hydra.compose(config_name='config')
     except:
-        print("⚠️  无法加载Hydra配置，使用随机策略")
-        cfg = None
+        print("⚠️  无法加载Hydra配置，将使用随机策略")
 
-    trainer = PiperRobotTrainer()
-    trainer.init_hardware()
+    ws = Workspace(cfg=cfg)
+    ws.action_sleep = args.action_sleep
+    ws._buffer_dir = Path.cwd() / args.buffer_dir
 
-    # 初始化Agent
+    ws.setup()
+
     if cfg is not None:
-        try:
-            import agents.mentor_mw as mentor_mw
-            obs_spec = trainer._obs_spec
-            act_spec = trainer._act_spec
-            cfg.obs_shape = obs_spec.shape
-            cfg.action_shape = act_spec.shape
-            trainer.agent = hydra.utils.instantiate(cfg.agent)
-            trainer.agent = trainer.agent.to(trainer.device)
-            print("✅ Agent初始化成功")
-        except Exception as e:
-            print(f"⚠️  Agent初始化失败: {e}")
-            trainer.agent = None
+        ws.make_agent(cfg)
 
-    # 加载快照
     if args.snapshot:
-        trainer.load_snapshot(args.snapshot)
+        ws.load_snapshot(args.snapshot)
 
-    # 开始训练
-    trainer.train(num_episodes=args.episodes, max_steps_per_episode=args.steps)
+    if args.eval:
+        ws.eval(num_episodes=args.eval_episodes, max_steps_per_episode=args.steps)
+    else:
+        ws.train(num_episodes=args.episodes, max_steps_per_episode=args.steps)
 
 
 if __name__ == '__main__':

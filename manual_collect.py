@@ -2,13 +2,12 @@ import numpy as np
 import time
 import cv2
 import os
-from collections import deque, namedtuple
+from collections import deque
 import sys
 import threading
 from pathlib import Path
-from dm_env import specs
+from dm_env import specs, TimeStep as DMTimeStep, StepType
 
-# 确保核心模块路径
 script_dir = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, script_dir)
 
@@ -19,89 +18,45 @@ except ImportError as e:
     print(f"错误：无法导入核心模块: {e}")
     sys.exit(1)
 
-# ====================== 核心修复1：正确的TimeStep定义（支持字符串索引） ======================
-# 字段名必须与下方data_specs的name完全一一对应
-_TimeStepBase = namedtuple('_TimeStepBase', [
-    'observation', 'action', 'reward', 'discount', 'first', 'is_last'
-])
 
-class TimeStep(_TimeStepBase):
-    def __getitem__(self, key):
-        # 解决replay_buffer中time_step[spec.name]的字符串索引问题
-        if isinstance(key, str):
-            return getattr(self, key)
-        return super().__getitem__(key)
-    
-    def last(self):
-        return self.is_last
-
-class SimpleSpacemouseCollect:
-    def __init__(self):
-        print("="*60)
-        print("     Piper 3D鼠标数据收集工具 (Buffer写入最终修复版)")
-        print("="*60)
+class PiperCollectEnv:
+    def __init__(self, factor=1000, img_height=256, img_width=256):
+        self.factor = factor
+        self.IMG_HEIGHT = img_height
+        self.IMG_WIDTH = img_width
         
-        self.end = False
-        self._running = True
-        self._lock = threading.Lock()
-        
-        # 硬件参数
-        self.robot_cam = None
-        self.piper_arm = None
-        self.IMG_HEIGHT = 256
-        self.IMG_WIDTH = 256
-        self.factor = 1000
-        self.control_sleep = 0.01
-        
-        # 机械臂初始位姿
         self.X, self.Y, self.Z = 300614, -12185, 282341
         self.RX, self.RY, self.RZ = -179351, 23933, 177934
-        self.joint_6 = 80000 
+        self.joint_6 = 80000
         
-        # 数据缓存
+        self.robot_cam = None
+        self.piper_arm = None
         self.frames_queue = deque(maxlen=3)
-        self.data_buffer = []  # NPZ备份
-        self._buffer_dir = Path.cwd() / 'buffer'
-        self.replay_storage = None
-        
-        # 状态变量
-        self.episode = 0
-        self.episode_step = 0
-        self._last_action = None
+        self._lock = threading.Lock()
+        self._latest_frame = None
+        self._running = True
         self._obs_spec = None
         self._act_spec = None
-        self._latest_frame = None
+        
+        self._reward = 0.0
+        self._step_count = 0
 
     def _init_replay_storage(self):
-        """初始化ReplayBuffer，严格匹配spec字段名和类型"""
-        print(f"\n[Buffer] 数据将保存至: {self._buffer_dir.resolve()}")
-        
-        # 创建临时环境获取真实spec
         temp_env = piper_env.make(
             task_name='piper_push', seed=0, action_repeat=2,
             size=(self.IMG_HEIGHT, self.IMG_WIDTH), use_sim=True, frame_stack=3
         )
         self._obs_spec = temp_env.observation_spec()
         self._act_spec = temp_env.action_spec()
-        
-        # ====================== 核心修复2：spec.name与TimeStep字段完全对应 ======================
-        data_specs = (
-            specs.Array(self._obs_spec.shape, self._obs_spec.dtype, 'observation'),
-            specs.Array(self._act_spec.shape, self._act_spec.dtype, 'action'),
-            specs.Array((1,), np.float32, 'reward'),
-            specs.Array((1,), np.float32, 'discount')
-        )
-        
-        self.replay_storage = ReplayBufferStorage(data_specs, self._buffer_dir)
         temp_env.close()
-        
-        # 打印spec信息方便调试
-        print(f"[Buffer] Observation: {self._obs_spec.shape}, {self._obs_spec.dtype}")
-        print(f"[Buffer] Action: {self._act_spec.shape}, {self._act_spec.dtype}")
-        print("✅ ReplayBuffer初始化完成")
+
+    def observation_spec(self):
+        return self._obs_spec
+
+    def action_spec(self):
+        return self._act_spec
 
     def init_hardware(self):
-        """初始化硬件（保留你原有的相机/机械臂逻辑）"""
         from piper.robot import PiperRobot
         from piper_sdk import C_PiperInterface_V2
         
@@ -126,57 +81,12 @@ class SimpleSpacemouseCollect:
         self.piper_arm.GripperCtrl(abs(self.joint_6), 1000, 0x01, 0)
         print("✅ 机械臂初始化成功")
         
-        # 初始化Buffer
         self._init_replay_storage()
         
-        # 启动图像采集线程
         threading.Thread(target=self._image_thread, daemon=True).start()
-        time.sleep(0.5)  # 等待相机预热
-
-    def set_gripper_open(self):
-        """夹爪打开"""
-        self.joint_6 = 80000
-        self.piper_arm.GripperCtrl(abs(self.joint_6), 1000, 0x01, 0)
         time.sleep(0.5)
 
-    def get_stacked_obs(self):
-        """获取堆叠帧，严格匹配obs_spec的dtype"""
-        with self._lock:
-            frames = list(self.frames_queue)
-        
-        while len(frames) < 3:
-            frames.append(frames[0] if frames else np.zeros((self.IMG_HEIGHT, self.IMG_WIDTH, 3), dtype=np.uint8))
-        
-        stacked = np.concatenate(frames, axis=-1)
-        stacked = np.transpose(stacked, (2, 0, 1))
-        
-        # 自动匹配obs_spec的dtype
-        if self._obs_spec.dtype == np.uint8:
-            return stacked.astype(np.uint8)
-        return (stacked.astype(np.float32) / 255.0)
-
-    # ====================== 核心修复3：Action对齐逻辑 ======================
-    def align_action(self, x, y, z, gripper_raw):
-        """将3D鼠标输入对齐到环境要求的action形状和范围"""
-        # 将3D鼠标值映射到[-20, 20]范围，然后除以20归一化到[-1, 1]
-        dx = np.clip(x * 40.0, -20.0, 20.0) / 20.0  # [-0.5, 0.5] -> [-20, 20] -> [-1, 1]
-        dy = np.clip(y * 40.0, -20.0, 20.0) / 20.0
-        dz = np.clip(z * 40.0, -20.0, 20.0) / 20.0
-        dg = np.clip((gripper_raw / 1000000.0 - 0.04) * 50.0, -1.0, 1.0)
-        
-        # 自动适配不同长度的action维度1
-        action = np.zeros(self._act_spec.shape, dtype=self._act_spec.dtype)
-        if self._act_spec.shape[0] >= 3:
-            action[0:3] = [dx, dy, dz]
-        if self._act_spec.shape[0] >= 7:
-            action[6] = dg  # 7维action：夹爪在第7位
-        elif self._act_spec.shape[0] == 4:
-            action[3] = dg  # 4维action：夹爪在第4位
-        
-        return action
-
     def _image_thread(self):
-        """图像采集线程"""
         while self._running:
             try:
                 frame = self.robot_cam.get_camera_image()
@@ -189,9 +99,186 @@ class SimpleSpacemouseCollect:
                 print(f"⚠️ 图像采集异常: {e}")
             time.sleep(0.002)
 
+    def _get_stacked_obs(self):
+        with self._lock:
+            frames = list(self.frames_queue)
+        
+        while len(frames) < 3:
+            frames.append(frames[0] if frames else np.zeros((self.IMG_HEIGHT, self.IMG_WIDTH, 3), dtype=np.uint8))
+        
+        stacked = np.concatenate(frames, axis=-1)
+        stacked = np.transpose(stacked, (2, 0, 1))
+        
+        if self._obs_spec.dtype == np.uint8:
+            return stacked.astype(np.uint8)
+        return (stacked.astype(np.float32) / 255.0)
+
+    def _apply_action(self, state_x, state_y, state_z, gripper_btn_0, gripper_btn_1):
+        state_x_clip = np.clip(state_x * 40.0, -20.0, 20.0)
+        state_y_clip = np.clip(state_y * 40.0, -20.0, 20.0)
+        state_z_clip = np.clip(state_z * 40.0, -20.0, 20.0)
+        
+        self.X += round(state_x_clip * self.factor)
+        self.Y += round(state_y_clip * self.factor)
+        self.Z += round(state_z_clip * self.factor)
+        
+        if gripper_btn_0:
+            self.joint_6 = 80000
+        elif gripper_btn_1:
+            self.joint_6 = 0
+        
+        self.piper_arm.EndPoseCtrl(self.X, self.Y, self.Z, self.RX, self.RY, self.RZ)
+        self.piper_arm.GripperCtrl(abs(self.joint_6), 1000, 0x01, 0)
+
+    def _get_action_for_buffer(self, state_x, state_y, state_z, gripper_raw):
+        dx = np.clip(state_x * 40.0, -20.0, 20.0) / 20.0
+        dy = np.clip(state_y * 40.0, -20.0, 20.0) / 20.0
+        dz = np.clip(state_z * 40.0, -20.0, 20.0) / 20.0
+        dg = 1.0 if gripper_raw > 40000 else -1.0
+        
+        action = np.zeros(self._act_spec.shape, dtype=self._act_spec.dtype)
+        if self._act_spec.shape[0] >= 3:
+            action[0:3] = [dx, dy, dz]
+        if self._act_spec.shape[0] >= 7:
+            action[6] = dg
+        elif self._act_spec.shape[0] == 4:
+            action[3] = dg
+        
+        return action
+
+    def reset(self):
+        self.X, self.Y, self.Z = 300614, -12185, 282341
+        self.joint_6 = 80000
+        self.piper_arm.EndPoseCtrl(self.X, self.Y, self.Z, self.RX, self.RY, self.RZ)
+        self.piper_arm.GripperCtrl(abs(self.joint_6), 1000, 0x01, 0)
+        
+        self.frames_queue.clear()
+        for _ in range(3):
+            frame = self.robot_cam.get_camera_image()
+            if frame is not None:
+                self.frames_queue.append(frame)
+        
+        self._reward = 0.0
+        self._step_count = 0
+        
+        obs = self._get_stacked_obs()
+        return DMTimeStep(
+            step_type=StepType.FIRST,
+            reward=None,
+            discount=None,
+            observation=obs
+        )
+
+    def step(self, state, reward=0.0):
+        self._apply_action(state.x, state.y, state.z, state.buttons[0], state.buttons[1])
+        
+        new_frame = self.robot_cam.get_camera_image()
+        if new_frame is not None:
+            self.frames_queue.append(new_frame)
+        
+        obs = self._get_stacked_obs()
+        self._reward = reward
+        self._step_count += 1
+        
+        return DMTimeStep(
+            step_type=StepType.MID,
+            reward=np.float32(self._reward),
+            discount=np.float32(1.0),
+            observation=obs
+        )
+
+    def step_last(self, state):
+        self._apply_action(state.x, state.y, state.z, state.buttons[0], state.buttons[1])
+        
+        new_frame = self.robot_cam.get_camera_image()
+        if new_frame is not None:
+            self.frames_queue.append(new_frame)
+        
+        obs = self._get_stacked_obs()
+        
+        return DMTimeStep(
+            step_type=StepType.LAST,
+            reward=np.float32(0.0),
+            discount=np.float32(0.0),
+            observation=obs
+        )
+
+    def get_latest_frame(self):
+        with self._lock:
+            return self._latest_frame.copy() if self._latest_frame is not None else None
+
+    def close(self):
+        self._running = False
+        time.sleep(0.3)
+        if self.piper_arm is not None:
+            self.piper_arm.EmergencyStop()
+            self.piper_arm.DisconnectPort()
+        if self.robot_cam is not None:
+            self.robot_cam.close()
+
+
+class TimeStepWithAction:
+    def __init__(self, observation, action, reward, discount, step_type):
+        self.observation = observation
+        self.action = action
+        self.reward = reward
+        self.discount = discount
+        self.step_type = step_type
+        self.first = (step_type == StepType.FIRST)
+        self.is_last = (step_type == StepType.LAST)
+
+    def last(self):
+        return self.is_last
+
+    def __getitem__(self, key):
+        if isinstance(key, str):
+            return getattr(self, key)
+        raise KeyError(f"Invalid key: {key}")
+
+
+class SimpleSpacemouseCollect:
+    def __init__(self):
+        print("="*60)
+        print("     Piper 3D鼠标数据收集工具 (重构版)")
+        print("="*60)
+        
+        self.IMG_HEIGHT = 256
+        self.IMG_WIDTH = 256
+        
+        self._buffer_dir = Path.cwd() / 'buffer'
+        self.replay_storage = None
+        self.data_buffer = []
+        
+        self.env = PiperCollectEnv(
+            factor=1000,
+            img_height=self.IMG_HEIGHT,
+            img_width=self.IMG_WIDTH
+        )
+        
+        self.episode = 0
+        self.episode_step = 0
+        self._global_step = 0
+
+    def _init_replay_storage(self):
+        print(f"\n[Buffer] 数据将保存至: {self._buffer_dir.resolve()}")
+        
+        data_specs = (
+            self.env.observation_spec(),
+            self.env.action_spec(),
+            specs.Array((1,), np.float32, 'reward'),
+            specs.Array((1,), np.float32, 'discount')
+        )
+        
+        self.replay_storage = ReplayBufferStorage(data_specs, self._buffer_dir)
+        
+        print(f"[Buffer] Observation: {self.env.observation_spec().shape}, {self.env.observation_spec().dtype}")
+        print(f"[Buffer] Action: {self.env.action_spec().shape}, {self.env.action_spec().dtype}")
+        print("✅ ReplayBuffer初始化完成")
+
     def collect(self, num_episodes=5, max_steps=200, episode_sleep=2.0):
-        """主收集循环"""
-        self.init_hardware()
+        self.env.init_hardware()
+        self._init_replay_storage()
+        
         cv2.namedWindow("Data Collection", cv2.WINDOW_NORMAL)
         cv2.resizeWindow("Data Collection", 640, 480)
         
@@ -205,133 +292,131 @@ class SimpleSpacemouseCollect:
         try:
             import pyspacemouse
             with pyspacemouse.open() as device:
-                while self.episode < num_episodes and self._running:
-                    state = device.read()
+                while self.episode < num_episodes:
+                    time_step = self.env.reset()
                     
-                    # 1. 机械臂物理控制
-                    # 将3D鼠标值映射到[-20, 20]范围，然后乘以factor=1000
-                    state_x_clip = np.clip(state.x * 40.0, -20.0, 20.0)  # [-0.5, 0.5] -> [-20, 20]
-                    state_y_clip = np.clip(state.y * 40.0, -20.0, 20.0)
-                    state_z_clip = np.clip(state.z * 40.0, -20.0, 20.0)
+                    zero_action = np.zeros(self.env.action_spec().shape, dtype=self.env.action_spec().dtype)
+                    ts_init = TimeStepWithAction(
+                        observation=time_step.observation,
+                        action=zero_action,
+                        reward=np.array([0.0], dtype=np.float32),
+                        discount=np.array([1.0], dtype=np.float32),
+                        step_type=StepType.FIRST
+                    )
+                    self.replay_storage.add(ts_init)
                     
-                    self.X += round(state_x_clip * self.factor)
-                    self.Y += round(state_y_clip * self.factor)
-                    self.Z += round(state_z_clip * self.factor)
+                    self.episode_step = 0
+                    episode_reward = 0.0
                     
-                    if state.buttons[0]:
-                        self.joint_6 = 80000
-                    elif state.buttons[1]:
-                        self.joint_6 = 0
+                    print(f"\n🎬 Episode {self.episode+1}/{num_episodes} 开始")
                     
-                    self.piper_arm.EndPoseCtrl(self.X, self.Y, self.Z, self.RX, self.RY, self.RZ)
-                    self.piper_arm.GripperCtrl(abs(self.joint_6), 1000, 0x01, 0)
-                    
-                    # 2. 可视化与键盘输入
-                    current_reward = 0.0
-                    if self._latest_frame is not None:
-                        display = cv2.cvtColor(self._latest_frame, cv2.COLOR_RGB2BGR)
-                        cv2.putText(display, f"Ep:{self.episode+1}/{num_episodes} Step:{self.episode_step}/{max_steps}", 
-                                   (10, 30), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 255, 0), 2)
-                        cv2.putText(display, f"Buffer: {len(self.replay_storage)}", 
-                                   (10, 70), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (255, 255, 0), 2)
-                        cv2.imshow("Data Collection", display)
-                    
-                    key = cv2.waitKey(1) & 0xFF
-                    if key == ord(' '):
-                        self.end=True
-                        current_reward = 10.0
-                        print(f"[奖励] Ep{self.episode+1} Step{self.episode_step} | +10.0")
-                    elif key == ord('q'):
-                        print("\n用户终止收集，正在保存数据...")
-                        self._running = False
-                        break
-                    
-                    # ====================== 核心修复4：每一步正确写入TimeStep ======================
-                    if len(self.frames_queue) >= 3:
-                        obs_t = self.get_stacked_obs()
-                        action_t = self.align_action(state.x, state.y, state.z, self.joint_6)
-                        self._last_action = action_t
+                    for step in range(max_steps):
+                        state = device.read()
                         
-                        # 构造完全符合spec要求的TimeStep
-                        ts = TimeStep(
-                            observation=obs_t,
-                            action=action_t,
-                            reward=np.array([current_reward], dtype=np.float32),  # 必须是(1,)数组
-                            discount=np.array([1.0], dtype=np.float32),          # 必须是(1,)数组
-                            first=(self.episode_step == 0),
-                            is_last=False
+                        current_reward = 0.0
+                        episode_ended_early = False
+                        frame = self.env.get_latest_frame()
+                        if frame is not None:
+                            display = cv2.cvtColor(frame, cv2.COLOR_RGB2BGR)
+                            cv2.putText(display, f"Ep:{self.episode+1}/{num_episodes} Step:{step+1}/{max_steps}", 
+                                       (10, 30), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 255, 0), 2)
+                            cv2.putText(display, f"Buffer: {len(self.replay_storage)}", 
+                                       (10, 70), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (255, 255, 0), 2)
+                            cv2.imshow("Data Collection", display)
+                        
+                        key = cv2.waitKey(1) & 0xFF
+                        if key == ord(' '):
+                            current_reward = 10.0
+                            print(f"[奖励] Ep{self.episode+1} Step{step+1} | +10.0 | 结束episode")
+                            episode_ended_early = True
+                        elif key == ord('q'):
+                            print("\n用户终止收集，正在保存数据...")
+                            self.env.close()
+                            cv2.destroyAllWindows()
+                            self.save_npz()
+                            return
+                        
+                        action = self.env._get_action_for_buffer(state.x, state.y, state.z, self.env.joint_6)
+                        
+                        if episode_ended_early:
+                            ts_last = self.env.step_last(state)
+                            ts_final = TimeStepWithAction(
+                                observation=ts_last.observation,
+                                action=action,
+                                reward=np.array([current_reward], dtype=np.float32),
+                                discount=np.array([0.0], dtype=np.float32),
+                                step_type=StepType.LAST
+                            )
+                            self.replay_storage.add(ts_final)
+                            episode_reward += current_reward
+                            self.episode_step += 1
+                            self._global_step += 1
+                            break
+                        
+                        time_step = self.env.step(state, reward=current_reward)
+                        episode_reward += current_reward
+                        
+                        ts = TimeStepWithAction(
+                            observation=time_step.observation,
+                            action=action,
+                            reward=np.array([time_step.reward], dtype=np.float32),
+                            discount=np.array([time_step.discount], dtype=np.float32),
+                            step_type=time_step.step_type
                         )
                         
-                        # 写入ReplayBuffer（不会立即落盘，会缓存到episode结束）
                         self.replay_storage.add(ts)
                         
-                        # 同时写入NPZ备份
                         self.data_buffer.append({
-                            'observation': obs_t,
-                            'action': action_t,
+                            'observation': ts.observation,
+                            'action': action,
                             'reward': current_reward
                         })
+                        
+                        self.episode_step += 1
+                        self._global_step += 1
+                        
+                        time.sleep(0.01)
                     
-                    self.episode_step += 1
+                    state = device.read()
+                    ts_last = self.env.step_last(state)
+                    action = self.env._get_action_for_buffer(state.x, state.y, state.z, self.env.joint_6)
                     
-                    # ====================== 核心修复5：Episode结束写入LAST帧（触发落盘） ======================
-                    if self.episode_step >= max_steps or self.end:
-                        # 必须写入is_last=True的帧，ReplayBuffer才会将整个episode写入磁盘
-                        ts_last = TimeStep(
-                            observation=self.get_stacked_obs(),
-                            action=self._last_action,
-                            reward=np.array([0.0], dtype=np.float32),
-                            discount=np.array([0.0], dtype=np.float32),  # 结束帧discount必须为0
-                            first=False,
-                            is_last=True
-                        )
-                        self.replay_storage.add(ts_last)
-                        
-                        print(f"\n✅ Episode {self.episode+1} 完成，已写入Buffer")
-                        print(f"   当前Buffer总步数: {len(self.replay_storage)}")
-                        
-                        # 机械臂复位
-                        self.X, self.Y, self.Z = 300614, -12185, 282341
-                        self.piper_arm.EndPoseCtrl(self.X, self.Y, self.Z, self.RX, self.RY, self.RZ)
-                        self.set_gripper_open()
-                        
-                        print(f"请重新摆放物体... 休眠 {episode_sleep}s")
-                        time.sleep(episode_sleep)
-                        
-                        # 重置episode状态
-                        self.episode += 1
-                        self.episode_step = 0
-                        self.end = False
+                    ts_final = TimeStepWithAction(
+                        observation=ts_last.observation,
+                        action=action,
+                        reward=np.array([0.0], dtype=np.float32),
+                        discount=np.array([0.0], dtype=np.float32),
+                        step_type=StepType.LAST
+                    )
                     
-                    time.sleep(self.control_sleep)
+                    if not episode_ended_early:
+                        self.replay_storage.add(ts_final)
+                    
+                    print(f"\n✅ Episode {self.episode+1} 完成 | Reward: {episode_reward:.1f} | Buffer: {len(self.replay_storage)}")
+                    
+                    self.env.X, self.env.Y, self.env.Z = 300614, -12185, 282341
+                    self.env.piper_arm.EndPoseCtrl(self.env.X, self.env.Y, self.env.Z, self.env.RX, self.env.RY, self.env.RZ)
+                    self.env.joint_6 = 80000
+                    self.env.piper_arm.GripperCtrl(abs(self.env.joint_6), 1000, 0x01, 0)
+                    
+                    print(f"请重新摆放物体... 休眠 {episode_sleep}s")
+                    time.sleep(episode_sleep)
+                    
+                    self.episode += 1
         
         except ImportError:
             print("❌ 错误：pyspacemouse未安装，请执行 pip install pyspacemouse")
         except KeyboardInterrupt:
             print("\n用户中断收集")
         finally:
-            # 资源释放
-            self._running = False
-            time.sleep(0.3)  # 等待线程退出
+            self.env.close()
             cv2.destroyAllWindows()
-            
-            if self.piper_arm is not None:
-                self.piper_arm.EmergencyStop()
-                self.piper_arm.DisconnectPort()
-                print("✅ 机械臂已断开")
-            
-            if self.robot_cam is not None:
-                self.robot_cam.close()
-                print("✅ 相机已释放")
-            
-            # 保存NPZ备份
             self.save_npz()
             
             print(f"\n📊 收集完成！Buffer总有效步数: {len(self.replay_storage)}")
             print(f"📂 Buffer文件位置: {self._buffer_dir.resolve()}")
 
     def save_npz(self, filename="spacemouse_backup.npz"):
-        """保存NPZ格式备份"""
         if not self.data_buffer:
             print("⚠️ 没有数据需要备份")
             return
@@ -350,6 +435,7 @@ class SimpleSpacemouseCollect:
             print(f"✅ NPZ备份已保存: {os.path.abspath(filename)}")
         except Exception as e:
             print(f"❌ NPZ备份失败: {e}")
+
 
 def main():
     collector = SimpleSpacemouseCollect()
@@ -372,6 +458,7 @@ def main():
         elif choice == '2':
             print("退出程序")
             break
+
 
 if __name__ == '__main__':
     main()
