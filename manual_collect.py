@@ -265,8 +265,8 @@ class SimpleSpacemouseCollect:
         data_specs = (
             self.env.observation_spec(),
             self.env.action_spec(),
-            specs.Array((1,), np.float32, 'reward'),
-            specs.Array((1,), np.float32, 'discount')
+            specs.Array((), np.float32, 'reward'),
+            specs.Array((), np.float32, 'discount')
         )
         
         self.replay_storage = ReplayBufferStorage(data_specs, self._buffer_dir)
@@ -299,8 +299,8 @@ class SimpleSpacemouseCollect:
                     ts_init = TimeStepWithAction(
                         observation=time_step.observation,
                         action=zero_action,
-                        reward=np.array([0.0], dtype=np.float32),
-                        discount=np.array([1.0], dtype=np.float32),
+                        reward=np.float32(0.0),
+                        discount=np.float32(1.0),
                         step_type=StepType.FIRST
                     )
                     self.replay_storage.add(ts_init)
@@ -343,8 +343,8 @@ class SimpleSpacemouseCollect:
                             ts_final = TimeStepWithAction(
                                 observation=ts_last.observation,
                                 action=action,
-                                reward=np.array([current_reward], dtype=np.float32),
-                                discount=np.array([0.0], dtype=np.float32),
+                                reward=np.float32(current_reward),
+                                discount=np.float32(0.0),
                                 step_type=StepType.LAST
                             )
                             self.replay_storage.add(ts_final)
@@ -359,8 +359,8 @@ class SimpleSpacemouseCollect:
                         ts = TimeStepWithAction(
                             observation=time_step.observation,
                             action=action,
-                            reward=np.array([time_step.reward], dtype=np.float32),
-                            discount=np.array([time_step.discount], dtype=np.float32),
+                            reward=np.float32(time_step.reward),
+                            discount=np.float32(time_step.discount),
                             step_type=time_step.step_type
                         )
                         
@@ -384,8 +384,8 @@ class SimpleSpacemouseCollect:
                     ts_final = TimeStepWithAction(
                         observation=ts_last.observation,
                         action=action,
-                        reward=np.array([0.0], dtype=np.float32),
-                        discount=np.array([0.0], dtype=np.float32),
+                        reward=np.float32(0.0),
+                        discount=np.float32(0.0),
                         step_type=StepType.LAST
                     )
                     

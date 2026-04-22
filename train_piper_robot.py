@@ -189,8 +189,8 @@ class PiperCollectEnv:
         return TimeStepWithAction(
             observation=obs,
             action=np.zeros(self._act_spec.shape, dtype=self._act_spec.dtype),
-            reward=np.array([0.0], dtype=np.float32),
-            discount=np.array([1.0], dtype=np.float32),
+            reward=np.float32(0.0),
+            discount=np.float32(1.0),
             step_type=StepType.FIRST
         )
 
@@ -208,8 +208,8 @@ class PiperCollectEnv:
         return TimeStepWithAction(
             observation=obs,
             action=action,
-            reward=np.array([self._reward], dtype=np.float32),
-            discount=np.array([1.0], dtype=np.float32),
+            reward=np.float32(self._reward),
+            discount=np.float32(1.0),
             step_type=StepType.MID
         )
 
@@ -225,8 +225,8 @@ class PiperCollectEnv:
         return TimeStepWithAction(
             observation=obs,
             action=action,
-            reward=np.array([0.0], dtype=np.float32),
-            discount=np.array([0.0], dtype=np.float32),
+            reward=np.float32(0.0),
+            discount=np.float32(0.0),
             step_type=StepType.LAST
         )
 
@@ -340,8 +340,8 @@ class Workspace:
         data_specs = (
             self.env.observation_spec(),
             self.env.action_spec(),
-            specs.Array((1,), np.float32, 'reward'),
-            specs.Array((1,), np.float32, 'discount')
+            specs.Array((), np.float32, 'reward'),
+            specs.Array((), np.float32, 'discount')
         )
 
         self._buffer_dir.mkdir(exist_ok=True)
@@ -666,8 +666,8 @@ class Workspace:
                         ts = TimeStepWithAction(
                             observation=time_step.observation,
                             action=action,
-                            reward=np.array([manual_reward], dtype=np.float32),
-                            discount=np.array([0.0], dtype=np.float32),
+                            reward=np.float32(manual_reward),
+                            discount=np.float32(0.0),
                             step_type=StepType.LAST
                         )
                         self.replay_storage.add(ts)
@@ -678,7 +678,7 @@ class Workspace:
                         break
 
                     time_step = self.env.step(action, reward=0.0)
-                    episode_reward += time_step.reward[0]
+                    episode_reward += time_step.reward
 
                     self.replay_storage.add(time_step)
 
@@ -778,7 +778,7 @@ class Workspace:
                         return
 
                     time_step = self.env.step(action, reward=0.0)
-                    episode_reward += time_step.reward[0]
+                    episode_reward += time_step.reward
 
                     step_bar.set_postfix({
                         'Reward': f"{episode_reward:.1f}"
