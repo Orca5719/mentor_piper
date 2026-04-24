@@ -89,6 +89,8 @@ class ReplayBuffer(IterableDataset):
         self._save_snapshot = save_snapshot
 
     def _sample_episode(self):
+        if not self._episode_fns:
+            raise RuntimeError("Replay buffer is empty. Need more episodes before training.")
         eps_fn = random.choice(self._episode_fns)
         return self._episodes[eps_fn]
 
@@ -146,16 +148,36 @@ class ReplayBuffer(IterableDataset):
         obs = episode['observation'][idx - 1]
         action = episode['action'][idx]
         next_obs = episode['observation'][idx + self._nstep - 1]
-        reward = np.zeros_like(episode['reward'][idx])
-        discount = np.ones_like(episode['discount'][idx])
+
+        # 计算 n-step reward，确保结果是 float32
+        reward = np.float32(0.0)
+        discount = np.float32(1.0)
         for i in range(self._nstep):
             step_reward = episode['reward'][idx + i]
-            reward += discount * step_reward
-            discount *= episode['discount'][idx + i] * self._discount
+            # 确保 step_reward 是 float32
+            if hasattr(step_reward, 'item'):
+                step_reward = np.float32(step_reward.item())
+            else:
+                step_reward = np.float32(step_reward)
+            reward = reward + discount * step_reward
+
+            step_discount = episode['discount'][idx + i]
+            if hasattr(step_discount, 'item'):
+                step_discount = np.float32(step_discount.item())
+            else:
+                step_discount = np.float32(step_discount)
+            discount = discount * step_discount * np.float32(self._discount)
+
         return (obs, action, reward, discount, next_obs)
 
     def __iter__(self):
+        import time
         while True:
+            # 如果 buffer 为空，等待数据
+            while not self._episode_fns:
+                self._try_fetch()
+                if not self._episode_fns:
+                    time.sleep(0.1)  # 等待 0.1 秒后再检查
             yield self._sample()
 
     def update_nstep(self, new_nstep):

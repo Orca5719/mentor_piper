@@ -16,6 +16,7 @@ from pathlib import Path
 from copy import deepcopy
 from dm_env import StepType, specs
 from tqdm import tqdm
+import pyspacemouse
 
 script_dir = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, script_dir)
@@ -51,11 +52,12 @@ class TimeStepWithAction:
 
 
 class PiperCollectEnv:
-    def __init__(self, factor=1000, img_height=256, img_width=256, action_sleep=0.05):
+    def __init__(self, factor=1000, img_height=256, img_width=256, action_sleep=0.05, low_latency_mode=True):
         self.factor = factor
         self.IMG_HEIGHT = img_height
         self.IMG_WIDTH = img_width
         self.action_sleep = action_sleep
+        self.low_latency_mode = low_latency_mode
 
         self.X, self.Y, self.Z = 300614, -12185, 282341
         self.RX, self.RY, self.RZ = -179351, 23933, 177934
@@ -72,6 +74,10 @@ class PiperCollectEnv:
 
         self._reward = 0.0
         self._step_count = 0
+
+        # 低延迟优化
+        self._pending_commands = []  # 待发送命令队列
+        self._command_thread_running = False
 
     def _init_specs(self):
         temp_env = piper_env.make(
@@ -145,10 +151,17 @@ class PiperCollectEnv:
             return stacked.astype(np.uint8)
         return (stacked.astype(np.float32) / 255.0)
 
-    def _apply_action(self, action):
-        dx = int(round(action[0] * 20 * self.factor))
-        dy = int(round(action[1] * 20 * self.factor))
-        dz = int(round(action[2] * 20 * self.factor))
+    def _apply_action(self, action, wait=True):
+        """
+        执行动作
+
+        Args:
+            action: 动作向量
+            wait: 是否等待 action_sleep 时间（低延迟模式下可设为 False）
+        """
+        dx = int(round(action[0] * self.factor))
+        dy = int(round(action[1] * self.factor))
+        dz = int(round(action[2] * self.factor))
 
         self.X += dx
         self.Y += dy
@@ -160,15 +173,18 @@ class PiperCollectEnv:
 
         action_shape = len(action)
         gripper_idx = 6 if action_shape >= 7 else (3 if action_shape >= 4 else -1)
-        
+
         if gripper_idx >= 0 and gripper_idx < action_shape:
             self.joint_6 = int(80000) if action[gripper_idx] > 0 else int(0)
 
+        # 发送控制命令
         self.piper_arm.MotionCtrl_2(0x01, 0x00, 100, 0x00)
         self.piper_arm.EndPoseCtrl(self.X, self.Y, self.Z, self.RX, self.RY, self.RZ)
         self.piper_arm.GripperCtrl(abs(self.joint_6), 1000, 0x01, 0)
 
-        time.sleep(self.action_sleep)
+        # 低延迟模式：跳过等待，让控制循环自行控制频率
+        if wait and not self.low_latency_mode:
+            time.sleep(self.action_sleep)
 
     def reset(self):
         self.X, self.Y, self.Z = 300614, -12185, 282341
@@ -245,20 +261,40 @@ class PiperCollectEnv:
 
 
 class Workspace:
-    def __init__(self, cfg=None):
+    def __init__(self, cfg=None, use_cpu=False, batch_size=64, smaller_model=True, low_latency=False):
         self.work_dir = Path.cwd()
         self.cfg = cfg
+        self.low_latency_mode = low_latency
 
         self.IMG_HEIGHT = 256
         self.IMG_WIDTH = 256
         self.frame_stack = 3
-        self.batch_size = 256
-        self.update_every_episodes = 2
+        self.batch_size = batch_size
+        self.update_every_steps = 30
         self.save_interval = 1000
         self.seed_steps = 1000
         self.action_sleep = 0.05
 
-        self.device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+        # 根据参数决定设备
+        if use_cpu:
+            self.device = torch.device('cpu')
+            print("⚠️  使用 CPU 训练（速度较慢但稳定）")
+        else:
+            if torch.cuda.is_available():
+                # 检查 GPU 内存
+                gpu_mem = torch.cuda.get_device_properties(0).total_memory / 1024**3
+                print(f"GPU 总内存: {gpu_mem:.1f} GB")
+                if gpu_mem < 8:
+                    print(f"⚠️  GPU 内存较小 ({gpu_mem:.1f} GB)，建议使用 CPU 或减小 batch_size")
+                    print("   使用 --cpu 参数可强制使用 CPU")
+                self.device = torch.device('cuda')
+            else:
+                self.device = torch.device('cpu')
+                print("⚠️  未检测到 CUDA，使用 CPU 训练")
+
+        if low_latency:
+            print("✅ 启用低延迟模式")
+
         self._discount = 0.99
         self._discount_alpha = 0.0
         self._discount_alpha_temp = 1.0
@@ -274,7 +310,7 @@ class Workspace:
 
         self.replay_storage = None
         self.replay_loader = None
-        self.replay_iter = None
+        # self.replay_iter = None
         self.buffer = None
         self.agent = None
 
@@ -284,7 +320,7 @@ class Workspace:
             factor=1000,
             img_height=self.IMG_HEIGHT,
             img_width=self.IMG_WIDTH,
-            action_sleep=self.action_sleep
+            low_latency_mode=low_latency
         )
 
         self.human_intervened_this_episode = False
@@ -306,6 +342,8 @@ class Workspace:
         self.timestamp = time.strftime("%Y-%m-%d_%H-%M-%S")
         self.output_dir = Path.cwd() / "piper_outputs" / self.timestamp
         self.output_dir.mkdir(parents=True, exist_ok=True)
+
+        self.camera_device = pyspacemouse.open()
 
     @property
     def global_step(self):
@@ -349,7 +387,7 @@ class Workspace:
 
         self.replay_loader, self.buffer = make_replay_loader(
             self._buffer_dir, max_size=100000, batch_size=self.batch_size,
-            num_workers=4, save_snapshot=False,
+            num_workers=4, save_snapshot=True,
             nstep=math.floor(self._nstep + self._nstep_alpha),
             discount=self._discount - self._discount_alpha - self._discount_beta
         )
@@ -373,6 +411,16 @@ class Workspace:
         sm_action, is_intervening = self._read_spacemouse()
         self.is_intervening = is_intervening
 
+        # 评估模式：优先使用 agent
+        if eval_mode:
+            if self.agent is None:
+                print("[警告] 评估模式但 agent 为 None，使用零动作")
+                return np.zeros(self.env.action_spec().shape, dtype=np.float32)
+            with torch.no_grad(), utils.eval_mode(self.agent):
+                action = self.agent.act(obs, self._global_step, eval_mode=True)
+            return action
+
+        # 人类干预：使用 3D 鼠标
         if self.human_intervened_this_episode:
             if sm_action is None:
                 sm_action = np.zeros(self.env.action_spec().shape, dtype=np.float32)
@@ -403,6 +451,7 @@ class Workspace:
 
             return override_action
 
+        # 正在干预：接管控制
         if is_intervening and sm_action is not None:
             self.human_intervened_this_episode = True
 
@@ -431,41 +480,42 @@ class Workspace:
 
             return override_action
 
-        if self.agent is None or self._global_step < self.seed_steps:
-            action = np.zeros(self.env.action_spec().shape, dtype=self.env.action_spec().dtype)
-
-            if np.random.random() < self.random_drift_prob or np.linalg.norm(self.last_random_direction) == 0:
-                direction = np.random.uniform(-1, 1, 3)
-                direction = direction / np.linalg.norm(direction)
-                self.last_random_direction = direction
-            else:
-                direction = self.last_random_direction
-                direction += np.random.normal(0, 0.2, 3)
-                direction = direction / np.linalg.norm(direction)
-                self.last_random_direction = direction
-
-            action[:3] = direction * self.random_amplitude
-
-            action_shape = self.env.action_spec().shape[0]
-            gripper_idx = 6 if action_shape >= 7 else (3 if action_shape >= 4 else -1)
-            if gripper_idx >= 0 and self._global_step - self.last_gripper_change_step >= self.gripper_change_interval:
-                self.random_gripper_state = np.random.choice([1.0, -1.0])
-                self.last_gripper_change_step = self._global_step
-
-            if gripper_idx >= 0:
-                action[gripper_idx] = self.random_gripper_state
-
+        # Agent 可用且完成 seed 阶段：使用 agent
+        if self.agent is not None and self._global_step >= self.seed_steps:
+            with torch.no_grad(), utils.eval_mode(self.agent):
+                action = self.agent.act(obs, self._global_step, eval_mode=False)
             return action
 
-        with torch.no_grad(), utils.eval_mode(self.agent):
-            action = self.agent.act(obs, self._global_step, eval_mode=eval_mode)
+        # Seed 阶段或 Agent 不可用：使用随机探索
+        action = np.zeros(self.env.action_spec().shape, dtype=np.float32)
+
+        if np.random.random() < self.random_drift_prob or np.linalg.norm(self.last_random_direction) == 0:
+            direction = np.random.uniform(-1, 1, 3)
+            direction = direction / np.linalg.norm(direction)
+            self.last_random_direction = direction
+        else:
+            direction = self.last_random_direction
+            direction += np.random.normal(0, 0.2, 3)
+            direction = direction / np.linalg.norm(direction)
+            self.last_random_direction = direction
+
+        action[:3] = direction * self.random_amplitude
+
+        action_shape = self.env.action_spec().shape[0]
+        gripper_idx = 6 if action_shape >= 7 else (3 if action_shape >= 4 else -1)
+        if gripper_idx >= 0 and self._global_step - self.last_gripper_change_step >= self.gripper_change_interval:
+            self.random_gripper_state = np.random.choice([1.0, -1.0])
+            self.last_gripper_change_step = self._global_step
+
+        if gripper_idx >= 0:
+            action[gripper_idx] = self.random_gripper_state
 
         return action
 
     def _read_spacemouse(self):
         try:
             import pyspacemouse
-            state = pyspacemouse.read()
+            state = self.camera_device.read()
             if state is None:
                 return None, False
 
@@ -554,30 +604,38 @@ class Workspace:
 
         return True, manual_reward
 
-    def update_policy(self, num_updates=100):
+    def update_policy(self, num_updates=1):
         if self.agent is None or self.replay_loader is None:
             return None
 
         if self._global_step < self.seed_steps:
             return None
 
+        buffer_size = len(self.replay_storage) if hasattr(self.replay_storage, '__len__') else 0
+        min_required = max(self.batch_size, 64)
+        if buffer_size < min_required:
+            return None
+
         try:
-            self.update_buffer()
-            print(f"\n开始更新策略，执行 {num_updates} 次梯度更新...")
             metrics = None
-            for i in range(num_updates):
+            for _ in range(num_updates):
                 metrics = self.agent.update(self.replay_iter, self._global_step)
-                if i % 20 == 0:
-                    print(f"  进度: {i+1}/{num_updates}", end='\r')
-            
+
             if torch.cuda.is_available():
                 torch.cuda.empty_cache()
-            gc.collect()
-            
-            print(f"\n✅ 策略更新完成")
+
             return metrics
+        except RuntimeError as e:
+            if "out of memory" in str(e):
+                print(f"显存不足！尝试减小 batch_size（当前: {self.batch_size}）")
+                if torch.cuda.is_available():
+                    torch.cuda.empty_cache()
+                gc.collect()
+            else:
+                print(f"策略更新失败: {e}")
+            return None
         except Exception as e:
-            print(f"❌ 策略更新失败: {e}")
+            print(f"策略更新失败: {e}")
             return None
 
     def save_snapshot(self, step_id=None):
@@ -674,6 +732,12 @@ class Workspace:
                         episode_reward += manual_reward
                         self._global_step += 1
                         episode_ended_early = True
+
+                        if self._global_step % self.update_every_steps == 0 and self._global_step >= self.seed_steps:
+                            metrics = self.update_policy(num_updates=1)
+                            if metrics and self.logger:
+                                self.logger.log_metrics(metrics, self.global_step, ty='train')
+
                         step_bar.close()
                         break
 
@@ -683,6 +747,11 @@ class Workspace:
                     self.replay_storage.add(time_step)
 
                     self._global_step += 1
+
+                    if self._global_step % self.update_every_steps == 0 and self._global_step >= self.seed_steps:
+                        metrics = self.update_policy(num_updates=1)
+                        if metrics and self.logger:
+                            self.logger.log_metrics(metrics, self.global_step, ty='train')
 
                     if self._global_step % 1000 == 0:
                         if torch.cuda.is_available():
@@ -718,11 +787,6 @@ class Workspace:
 
                     ts_last = self.env.step_last(action)
                     self.replay_storage.add(ts_last)
-
-                if (episode + 1) % self.update_every_episodes == 0 and self._global_step >= self.seed_steps:
-                    metrics = self.update_policy(num_updates=100)
-                    if metrics and self.logger:
-                        self.logger.log_metrics(metrics, self.global_step, ty='train')
 
                 episodes_bar.set_postfix({
                     'Last Reward': f"{episode_reward:.1f}",
@@ -840,8 +904,12 @@ def main():
     parser.add_argument('--steps', type=int, default=1500, help='每个 episode 最大步数')
     parser.add_argument('--eval', action='store_true', help='仅进行评估')
     parser.add_argument('--eval_episodes', type=int, default=10, help='评估 episode 数量')
-    parser.add_argument('--action_sleep', type=float, default=0.05, help='机械臂动作间隔时间(秒)')
+    parser.add_argument('--action_sleep', type=float, default=0.001, help='机械臂动作间隔时间(秒)，越小延迟越低（推荐0.001-0.02）')
     parser.add_argument('--buffer_dir', type=str, default='buffer', help='Buffer目录路径')
+    parser.add_argument('--cpu', action='store_true', help='强制使用 CPU 训练（解决显存不足）')
+    parser.add_argument('--batch_size', type=int, default=64, help='训练批次大小（默认64，显存不足时可设为32或16）')
+    parser.add_argument('--small_model', action='store_true', default=True, help='使用更小的模型（减少显存占用）')
+    parser.add_argument('--low_latency', action='store_true', help='启用低延迟模式（减少可视化开销）')
 
     args = parser.parse_args()
 
@@ -852,7 +920,7 @@ def main():
     except:
         print("⚠️  无法加载Hydra配置，将使用随机策略")
 
-    ws = Workspace(cfg=cfg)
+    ws = Workspace(cfg=cfg, use_cpu=args.cpu, batch_size=args.batch_size, smaller_model=args.small_model, low_latency=args.low_latency)
     ws.action_sleep = args.action_sleep
     ws._buffer_dir = Path.cwd() / args.buffer_dir
 
@@ -860,6 +928,78 @@ def main():
 
     if cfg is not None:
         ws.make_agent(cfg)
+    else:
+        # Hydra 配置加载失败时，创建默认 Agent
+        print("⚠️  Hydra 配置加载失败，创建默认 Agent...")
+        from agents.mentor_mw import MENTORAgent
+
+        obs_shape = ws.env.observation_spec().shape
+        action_shape = ws.env.action_spec().shape
+
+        # 根据设备选择模型大小
+        if ws.device.type == 'cpu' or ws.batch_size <= 32:
+            # 小模型配置（节省显存）
+            hidden_dim = 256
+            feature_dim = 50
+            num_experts = 4
+            moe_gate_dim = 64
+            moe_hidden_dim = 64
+            top_k = 2
+            print("⚠️  使用小模型配置（节省显存）")
+        else:
+            # 默认配置
+            hidden_dim = 512
+            feature_dim = 50
+            num_experts = 8
+            moe_gate_dim = 128
+            moe_hidden_dim = 128
+            top_k = 2
+
+        ws.agent = MENTORAgent(
+            obs_shape=obs_shape,
+            action_shape=action_shape,
+            device=ws.device,
+            lr=0.0001,
+            feature_dim=feature_dim,
+            hidden_dim=hidden_dim,
+            critic_target_tau=0.01,
+            dormant_threshold=0.025,
+            target_dormant_ratio=0.2,
+            dormant_temp=10,
+            target_lambda=0.5,
+            lambda_temp=50,
+            perturb_interval=50000,
+            min_perturb_factor=0.2,
+            max_perturb_factor=0.95,
+            perturb_rate=2,
+            num_expl_steps=2000,
+            stddev_type='awake',
+            stddev_schedule='linear(1.0,0.1,500000)',
+            stddev_clip=0.3,
+            expectile=0.9,
+            use_tb=False,
+            lr_actor_ratio=1,
+            aux_loss_scale_warmup=-1,
+            aux_loss_scale_warmsteps=-1,
+            aux_loss_scale=0.002,
+            aux_loss_type='',
+            encoder_type='scratch',
+            resnet_fix=True,
+            oneXone_reg_scale=0.0,
+            oneXone_reg_ratio=0.5,
+            pretrained_factor=1.0,
+            tp_set_size=10,
+            moe_gate_dim=moe_gate_dim,
+            moe_hidden_dim=moe_hidden_dim,
+            num_experts=num_experts,
+            top_k=top_k,
+            dropout=0.1
+        )
+        ws.agent = ws.agent.to(ws.device)
+        print(f"✅ 默认 Agent 初始化成功")
+        print(f"   obs_shape: {obs_shape}, action_shape: {action_shape}")
+        print(f"   模型配置: hidden_dim={hidden_dim}, num_experts={num_experts}, top_k={top_k}")
+        print(f"   batch_size: {ws.batch_size}")
 
     if args.snapshot:
         ws.load_snapshot(args.snapshot)

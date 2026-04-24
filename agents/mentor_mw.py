@@ -372,6 +372,16 @@ class MENTORAgent(nn.Module):
     def update_critic(self, obs, action, reward, discount, next_obs, step):
         metrics = dict()
 
+        # 确保数据类型是 float32
+        reward = reward.float()
+        discount = discount.float()
+
+        # 确保 reward 和 discount 是正确的形状 [batch_size, 1]
+        if reward.dim() == 1:
+            reward = reward.unsqueeze(-1)
+        if discount.dim() == 1:
+            discount = discount.unsqueeze(-1)
+
         with torch.no_grad():
             dist, _ = self.actor(next_obs, self.stddev(step))
             next_action = dist.sample(clip=self.stddev_clip)
@@ -383,6 +393,10 @@ class MENTORAgent(nn.Module):
             target_Q = reward + (discount * target_V)
 
         Q1, Q2 = self.critic(obs, action)
+
+        # 确保 target_Q 形状与 Q1, Q2 匹配 [batch_size, 1]
+        target_Q = target_Q.reshape(Q1.shape)
+
         critic_loss = F.mse_loss(Q1, target_Q) + F.mse_loss(Q2, target_Q)
 
         if self.use_tb:

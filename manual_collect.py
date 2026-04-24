@@ -114,13 +114,13 @@ class PiperCollectEnv:
         return (stacked.astype(np.float32) / 255.0)
 
     def _apply_action(self, state_x, state_y, state_z, gripper_btn_0, gripper_btn_1):
-        state_x_clip = np.clip(state_x * 40.0, -20.0, 20.0)
-        state_y_clip = np.clip(state_y * 40.0, -20.0, 20.0)
-        state_z_clip = np.clip(state_z * 40.0, -20.0, 20.0)
+        # state_x_clip = np.clip(state_x * 40.0, -20.0, 20.0)
+        # state_y_clip = np.clip(state_y * 40.0, -20.0, 20.0)
+        # state_z_clip = np.clip(state_z * 40.0, -20.0, 20.0)
         
-        self.X += round(state_x_clip * self.factor)
-        self.Y += round(state_y_clip * self.factor)
-        self.Z += round(state_z_clip * self.factor)
+        self.X += round(state_x * self.factor)
+        self.Y += round(state_y * self.factor)
+        self.Z += round(state_z * self.factor)
         
         if gripper_btn_0:
             self.joint_6 = 80000
